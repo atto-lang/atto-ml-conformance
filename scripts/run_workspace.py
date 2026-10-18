@@ -59,7 +59,7 @@ def execute(repo: Path, script: str, compiler: Path, marker: str):
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
         proc = subprocess.Popen(["sh", script], cwd=repo, env=env,
                                 stdin=subprocess.DEVNULL, stdout=out, stderr=err,
-                                start_new_session=(os.name == "posix"))
+                                start_new_session=(os.name == "posix"), preexec_fn=limit_child_output)
         timed_out = False
         try:
             proc.wait(timeout=TIMEOUT)
