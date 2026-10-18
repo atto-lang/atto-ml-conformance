@@ -105,7 +105,7 @@ def execute(repo: Path, source: str, compiler: Path, marker: str):
 def verify_guest_source(repo: Path, source: str) -> str:
     """Bind executable fixture bytes to HEAD, including skip-worktree changes."""
     require(isinstance(source, str) and source.endswith(".ores") and
-            "\\\\" not in source and "//" not in source,
+            "\\" not in source and "//" not in source,
             "invalid guest source path")
     relative = Path(source)
     require(not relative.is_absolute() and relative.parts and
