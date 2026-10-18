@@ -75,6 +75,7 @@ def validate_workspace_imports(workspace: Path, source_lock: Path | None = None)
                 b"blob " + str(len(data)).encode() + b"\0" + data
             ).hexdigest()
     edges = set()
+    graph = {path: set() for path in sources}
     imports = 0
     for path, code in sources.items():
         seen = set()
@@ -105,6 +106,7 @@ def validate_workspace_imports(workspace: Path, source_lock: Path | None = None)
             target = Path(*parts)
             regular_inside_workspace(target, workspace)
             require(target in sources, "import target not part of pinned workspace")
+            graph[path].add(target)
             owner, provider = owners[path], owners[target]
             if owner != provider:
                 require((owner, provider) in ALLOWED_CROSS_EDGES,
@@ -119,6 +121,20 @@ def validate_workspace_imports(workspace: Path, source_lock: Path | None = None)
                 require(signature not in seen, "duplicate imported declaration")
                 seen.add(signature)
             imports += len(symbols)
+    # A structural source cycle is not a proof the language rejects a module,
+    # but a new cycle must be deliberately reviewed rather than silently added.
+    active, complete = set(), set()
+    def visit(source):
+        require(source not in active, "cyclic source import graph")
+        if source in complete:
+            return
+        active.add(source)
+        for target in graph[source]:
+            visit(target)
+        active.remove(source)
+        complete.add(source)
+    for source in graph:
+        visit(source)
     require(edges == EXPECTED_CROSS_EDGES, "ML tensor/autograd import closure incomplete")
     if source_lock is not None:
         lock_path = Path(source_lock)
