@@ -24,9 +24,9 @@ def classify(report):
         raise ValueError("missing compiler binary digest")
     if not SHA64.fullmatch(report.get("guest_source_sha256", "")):
         raise ValueError("missing guest source digest")
-    if report.get("guest_exit") != 0 or report.get("timeout") is not False:
+    if type(report.get("guest_exit")) is not int or report["guest_exit"] != 0 or report.get("timeout") is not False:
         return "EXECUTED_UNATTESTED"
-    if report.get("tests_passed") is not True or report.get("tests_skipped") != 0:
+    if report.get("tests_passed") is not True or type(report.get("tests_skipped")) is not int or report["tests_skipped"] != 0:
         return "EXECUTED_UNATTESTED"
     # Integrity of fields is not independent authentication of source-to-binary.
     # Separate trusted builder, immutably pinned provenance and reviewer needed.
@@ -54,7 +54,8 @@ class EvidenceGateTests(unittest.TestCase):
                 classify({**self.good, **change})
     def test_skips_and_runtime_failure_cannot_upgrade(self):
         for change in ({"tests_skipped":1},{"guest_exit":1},
-                       {"timeout":True},{"tests_passed":False}):
+                       {"timeout":True},{"tests_passed":False},
+                       {"guest_exit":False},{"tests_skipped":False}):
             self.assertEqual(classify({**self.good,**change}),"EXECUTED_UNATTESTED")
 
 if __name__=="__main__":
