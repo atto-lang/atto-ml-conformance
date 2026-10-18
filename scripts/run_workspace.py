@@ -46,7 +46,9 @@ def digest(path: Path) -> str:
 
 def git(repo: Path, *args: str) -> str:
     cp = subprocess.run(["git", "-C", str(repo), *args],
-                        capture_output=True, text=True, timeout=10, check=True)
+                        capture_output=True, text=True, timeout=10, check=True,
+                        env={"PATH": os.defpath, "LC_ALL": "C", "GIT_CONFIG_NOSYSTEM": "1",
+                             "GIT_CONFIG_GLOBAL": os.devnull, "GIT_NO_REPLACE_OBJECTS": "1"})
     return cp.stdout.strip()
 
 def require(condition, message):
@@ -109,8 +111,11 @@ def verify_guest_source(repo: Path, source: str) -> str:
             "invalid guest source path")
     relative = Path(source)
     require(not relative.is_absolute() and relative.parts and
+            source == relative.as_posix() and
             all(part not in ("", ".", "..") for part in relative.parts),
             "guest source must be a normal repository-relative path")
+    require(Path(git(repo, "rev-parse", "--show-toplevel")).resolve() == repo.resolve(),
+            "guest source repository Git root mismatch")
     target = repo
     for part in relative.parts:
         target = target / part
