@@ -114,6 +114,8 @@ def run(args):
         require(repo.is_dir(), "missing repository directory")
         actual = git(repo,"rev-parse","HEAD")
         require(actual == sha, f"{name}: pinned source commit mismatch")
+        tree = git(repo, "show", "-s", "--format=%T", "HEAD")
+        require(tree == trees[name], f"{name}: tree mismatch")
         require(not git(repo,"status","--porcelain"),
                 f"{name}: dirty or untracked working tree")
         repos[name] = repo
