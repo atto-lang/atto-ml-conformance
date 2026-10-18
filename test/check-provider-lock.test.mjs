@@ -68,3 +68,22 @@ test("noncanonical JSON is refused even with an updated SHA",()=>{
  s.lock.providers.find(p=>p.repository==="oreslang-tensor").gitBlobSha=gitBlobSha(s.documents["oreslang-tensor"]);
  assert.throws(()=>verifyProviderLock(s.lock,s.documents),/noncanonical/);
 });
+
+test("autograd interface cannot omit its tensor-owning upstream despite a re-pinned blob",()=>{
+ const s=clone();mutateDoc(s,"oreslang-autograd",d=>{
+   d.upstreams=d.upstreams.filter(name=>name!=="oreslang-tensor");
+ });
+ assert.throws(()=>verifyProviderLock(s.lock,s.documents),/missing upstream owner/);
+});
+test("ML consumer cannot omit its autograd-owning upstream despite a re-pinned blob",()=>{
+ const s=clone();mutateDoc(s,"oreslang-ml",d=>{
+   d.upstreams=d.upstreams.filter(name=>name!=="oreslang-autograd");
+ });
+ assert.throws(()=>verifyProviderLock(s.lock,s.documents),/missing upstream owner/);
+});
+test("ML consumer cannot omit its tensor-owning upstream despite a re-pinned blob",()=>{
+ const s=clone();mutateDoc(s,"oreslang-ml",d=>{
+   d.upstreams=d.upstreams.filter(name=>name!=="oreslang-tensor");
+ });
+ assert.throws(()=>verifyProviderLock(s.lock,s.documents),/missing upstream owner/);
+});
