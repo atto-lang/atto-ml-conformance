@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import signal
 import subprocess
+import resource
 import sys
 import tempfile
 
