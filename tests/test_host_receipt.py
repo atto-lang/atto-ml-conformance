@@ -101,5 +101,17 @@ class HostReceiptTests(unittest.TestCase):
             self.assertFalse((root / "receipt.json").exists())
 
 
+    def test_ci_pipeline_refuses_masked_node_or_python_failure(self):
+        workflow = (Path(__file__).resolve().parents[1] /
+                    ".github" / "workflows" / "host-evidence.yml").read_text()
+        for command in ("npm test 2>&1 | tee", "python3 -m unittest discover"):
+            self.assertIn("set -o pipefail", workflow)
+            self.assertIn(command, workflow)
+        for command in ("false | tee /dev/null", "sh -c 'exit 7' | tee /dev/null"):
+            proc = subprocess.run(["bash", "-ec", "set -o pipefail; " + command],
+                                  capture_output=True, text=True)
+            self.assertNotEqual(proc.returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
