@@ -56,6 +56,38 @@ class PinnedCheckoutIntegrityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'checkout dirty'):
             verify_pinned_checkouts(self.repos, self.commits, self.trees)
 
+    def test_skip_worktree_masked_change_denied(self):
+        repo = self.repos['oreslang-tensor']
+        self.cmd(repo, 'update-index', '--skip-worktree', 'fixture.txt')
+        (repo / 'fixture.txt').write_text('hidden modification\n')
+        self.assertEqual(self.cmd(repo, 'status', '--porcelain'), '')
+        with self.assertRaisesRegex(ValueError, 'masked or special Git index entry'):
+            verify_pinned_checkouts(self.repos, self.commits, self.trees)
+
+    def test_assume_unchanged_masked_change_denied(self):
+        repo = self.repos['oreslang-autograd']
+        self.cmd(repo, 'update-index', '--assume-unchanged', 'fixture.txt')
+        (repo / 'fixture.txt').write_text('hidden modification\n')
+        self.assertEqual(self.cmd(repo, 'status', '--porcelain'), '')
+        with self.assertRaisesRegex(ValueError, 'masked or special Git index entry'):
+            verify_pinned_checkouts(self.repos, self.commits, self.trees)
+
+    def test_index_flag_denied_even_without_mutation(self):
+        repo = self.repos['oreslang-ml']
+        self.cmd(repo, 'update-index', '--skip-worktree', 'fixture.txt')
+        with self.assertRaisesRegex(ValueError, 'masked or special Git index entry'):
+            verify_pinned_checkouts(self.repos, self.commits, self.trees)
+
+    def test_fsmonitor_config_does_not_execute_hook(self):
+        repo = self.repos['oreslang-tensor']
+        canary = self.root / 'executed-hook'
+        hook = self.root / 'fsmonitor.sh'
+        hook.write_text('#!/bin/sh\ntouch "' + str(canary) + '"\nexit 0\n')
+        hook.chmod(0o700)
+        self.cmd(repo, 'config', 'core.fsmonitor', str(hook))
+        self.assertIsNone(verify_pinned_checkouts(self.repos, self.commits, self.trees))
+        self.assertFalse(canary.exists())
+
     def test_wrong_tree_pin_denied(self):
         self.trees['oreslang-ml'] = '0' * 40
         with self.assertRaisesRegex(ValueError, 'Git tree changed'):
