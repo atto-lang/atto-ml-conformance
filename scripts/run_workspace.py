@@ -93,9 +93,8 @@ def execute(repo: Path, source: str, compiler: Path, marker: str):
     require(not timed_out, "guest execution timed out")
     require(proc.returncode == 0, f"{repo.name} {source}: guest exit {proc.returncode}: {stderr[-1000:]}")
     observed = stdout.splitlines()
-    required = marker.split("|")
-    require(all(m in observed for m in required),
-            f"{repo.name} {source}: missing required guest success markers")
+    require(observed == [marker],
+            f"{repo.name} {source}: unexpected guest stdout or missing exact success marker")
     return {"repo":repo.name,"source":source,"exit":proc.returncode,
             "stdout_sha256":hashlib.sha256(stdout.encode()).hexdigest(),
             "stderr_sha256":hashlib.sha256(stderr.encode()).hexdigest(),
