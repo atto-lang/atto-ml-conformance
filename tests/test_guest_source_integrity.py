@@ -1,5 +1,7 @@
 """Source-free local Git fixtures. Does not execute or export private Oreslang."""
 import subprocess
+import os
+from unittest.mock import patch
 import sys
 import tempfile
 import unittest
@@ -75,6 +77,21 @@ class GuestSourceIntegrityTests(unittest.TestCase):
     def test_double_slash_rejected(self):
         with self.assertRaisesRegex(ValueError, "invalid guest source path"):
             verify_guest_source(self.repo, "tests//smoke.ores")
+
+    def test_dot_prefix_rejected(self):
+        with self.assertRaisesRegex(ValueError, "normal repository-relative"):
+            verify_guest_source(self.repo, "./tests/smoke.ores")
+
+    def test_attacker_git_dir_env_cannot_redirect_source_identity(self):
+        with patch.dict(os.environ, {"GIT_DIR": str(self.root / "nonexistent"),
+                                     "GIT_WORK_TREE": str(self.root),
+                                     "GIT_NO_REPLACE_OBJECTS": "0"}):
+            self.assertEqual(verify_guest_source(self.repo, "tests/smoke.ores"), self.blob)
+
+    def test_nested_repository_path_cannot_borrow_parent_git_root(self):
+        child = self.repo / "tests"
+        with self.assertRaisesRegex(ValueError, "Git root mismatch"):
+            verify_guest_source(child, "smoke.ores")
 
     def test_other_extension_rejected(self):
         with self.assertRaisesRegex(ValueError, "invalid guest source path"):
