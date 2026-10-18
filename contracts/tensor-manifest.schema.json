@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oreslang.org/schemas/ml/tensor-manifest-v1.json",
+  "title": "Oreslang Tensor Manifest v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "dtype",
+    "device",
+    "layout",
+    "shape",
+    "storageLength"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "oreslang.tensor-manifest/v1"
+    },
+    "dtype": {
+      "enum": [
+        "f32",
+        "f64"
+      ]
+    },
+    "device": {
+      "const": "cpu"
+    },
+    "layout": {
+      "const": "contiguous"
+    },
+    "shape": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2147483647
+      },
+      "maxItems": 64
+    },
+    "storageLength": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2147483647
+    }
+  },
+  "additionalProperties": false
+}
