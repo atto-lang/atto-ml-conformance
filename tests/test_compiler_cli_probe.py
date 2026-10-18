@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from compiler_cli_probe import probe_compiler_cli
+from compiler_cli_probe import probe_compiler_cli, _run
 
 
 class CompilerCliProbeTests(unittest.TestCase):
@@ -119,6 +119,24 @@ exit 88
                                       f'"default_execution_mode":"{default}",'
                                       f'"guest_execution":"{execution}"' + '}'))
                 self.assertEqual(probe_compiler_cli(self.compiler, self.repo)['build_info']['build_mode'], mode)
+
+    def test_cli_probes_do_not_inherit_host_credentials(self):
+        from unittest.mock import patch
+        import os
+        self.compiler.write_text("""#!/bin/sh
+test -z "${GITHUB_TOKEN+x}" || exit 41
+test -z "${JAVA_TOOL_OPTIONS+x}" || exit 42
+test -z "${GIT_DIR+x}" || exit 43
+test -z "${LD_PRELOAD+x}" || exit 44
+exit 0
+""")
+        self.compiler.chmod(0o700)
+        with patch.dict(os.environ, {
+            'GITHUB_TOKEN': 'canary', 'JAVA_TOOL_OPTIONS': '-Dcanary=yes',
+            'GIT_DIR': '/tmp/invalid', 'LD_PRELOAD': '/tmp/invalid'
+        }):
+            code, out, err = _run(self.compiler, ['--build-info'], self.repo)
+        self.assertEqual((code, out, err), (0, b'', b''))
 
     def test_missing_or_symlink_positive_rejected(self):
         self.fake()

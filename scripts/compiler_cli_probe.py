@@ -34,8 +34,9 @@ def _bound_output():
 
 
 def _run(compiler: Path, args: list[str], cwd: Path):
-    env = os.environ.copy()
-    env.pop('ORESLANG_BIN', None)
+    # Exact allowlist: do not inherit access tokens, preload hooks, Git
+    # overrides, Java launcher options or provider-controlled PATH.
+    env = {'PATH': os.defpath, 'LANG': 'C', 'LC_ALL': 'C', 'TZ': 'UTC'}
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
         process = subprocess.Popen(
             [str(compiler), *args], cwd=cwd, env=env, stdin=subprocess.DEVNULL,
