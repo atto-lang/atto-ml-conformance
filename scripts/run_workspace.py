@@ -100,6 +100,11 @@ def run(args):
     shas = doc.get("repositories")
     require(isinstance(shas,dict) and set(shas)=={"oreslang-tensor","oreslang-autograd","oreslang-ml"},
             "manifest must pin all three producer repos exactly")
+    trees = doc.get("source_trees")
+    require(isinstance(trees, dict) and set(trees) == set(shas),
+            "manifest must pin each original source Git tree")
+    require(all(isinstance(tree, str) and SHA40.fullmatch(tree)
+                for tree in trees.values()), "invalid source tree identity")
     repos = {}
     for name, sha in shas.items():
         require(isinstance(sha,str) and SHA40.fullmatch(sha),
