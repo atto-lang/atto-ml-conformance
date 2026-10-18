@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import resource
 import signal
@@ -67,8 +68,8 @@ def probe_compiler_cli(compiler: Path, tensor_repo: Path) -> dict:
             'missing/escaping pinned positive source')
 
     code, output, errors = _run(compiler, ['--build-info'], tensor_repo)
-    require(code == 0 and len(output) <= 4096,
-            'missing bounded successful --build-info response')
+    require(code == 0 and not errors and len(output) <= 4096,
+            'missing clean bounded successful --build-info response')
     def unique_fields(items):
         result = {}
         for key, value in items:
@@ -104,8 +105,12 @@ def probe_compiler_cli(compiler: Path, tensor_repo: Path) -> dict:
         negative = Path(tmp) / 'parse-negative.ores'
         negative.write_bytes(b'pub routine main( {\n')
         code, bad_out, bad_err = _run(compiler, ['--check', str(negative)], Path(tmp))
-    require(code != 0 and bool(bad_err.strip()) and not bad_out,
-            'malformed Oreslang source was accepted or lacked a diagnostic')
+        # OresMain uses exit 1 for a source diagnostic, vs. exit 2 for bad
+        # command-line usage. Reject unrelated crashes/missing binary errors.
+        expected = re.compile(rb'^' + re.escape(os.fsencode(negative)) +
+                              rb':[1-9][0-9]*:[1-9][0-9]*: error: ', re.MULTILINE)
+        require(code == 1 and not bad_out and expected.search(bad_err) is not None,
+                'malformed Oreslang source was accepted or lacked a source diagnostic')
     return {
         'status': 'CLI_BEHAVIOR_PROBED_UNATTESTED',
         'launcher_contract': 'dev.oreslang.launcher.OresMain',
