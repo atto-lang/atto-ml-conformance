@@ -125,6 +125,7 @@ def run(args):
             "status":"EXECUTED_UNATTESTED",
             "compiler_sha256":digest(compiler),
             "source_commits":shas,
+            "source_trees":trees,
             "checks":jobs,
             "source_binary_provenance_attested":False,
             "automated_backend_parity_attested":False,
