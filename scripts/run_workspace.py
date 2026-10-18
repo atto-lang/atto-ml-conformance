@@ -123,7 +123,9 @@ def run(args):
         repos[name] = repo
     # Resolve cross-repo source imports and public symbols only after all three
     # checked-out commits, trees and cleanliness have been verified.
-    import_closure = validate_workspace_imports(workspace)
+    import_closure = validate_workspace_imports(
+        workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
+    )
     jobs = [execute(repos[name],script,compiler,marker)
             for name,script,marker in JOBS]
     return {"schema_version":"oreslang-ml-execution-probe/v1",
