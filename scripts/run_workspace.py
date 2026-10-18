@@ -25,6 +25,7 @@ TIMEOUT = 120
 JOBS = [
     ("oreslang-tensor", "scripts/test.sh", "ORES_ML_TENSOR_SMOKE_PASS"),
     ("oreslang-autograd", "scripts/test.sh", "ORES_ML_AUTOGRAD_SMOKE_PASS"),
+    ("oreslang-autograd", "scripts/test-workspace.sh", "ORES_ML_TENSOR_VJP_SMOKE_PASS"),
     ("oreslang-ml", "scripts/test.sh", "ORES_ML_TRAINING_SMOKE_PASS"),
     ("oreslang-ml", "scripts/test-workspace.sh", "ORES_ML_AUTOGRAD_TRAINING_PASS|ORES_ML_TWO_LAYER_RELU_AUTOGRAD_PASS"),
 ]
