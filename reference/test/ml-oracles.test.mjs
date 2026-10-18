@@ -1,0 +1,70 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {checkedNumel,addTensor,matmul2d,variable,add,multiply,gradients,finiteDifference,linearSgdEpoch} from "../ml-oracles.mjs";
+
+test("scalar tensor rank zero has one element",()=>assert.equal(checkedNumel([]),1));
+test("zero-length dimensions have zero elements",()=>assert.equal(checkedNumel([3,0,4]),0));
+test("checked row-major product",()=>assert.equal(checkedNumel([2,3,4]),24));
+test("reject negative dimension",()=>assert.throws(()=>checkedNumel([-1]),/invalid dimension/));
+test("reject fractional dimension",()=>assert.throws(()=>checkedNumel([1.25]),/invalid dimension/));
+test("reject unsafe numeric dimension",()=>assert.throws(()=>checkedNumel([Number.MAX_SAFE_INTEGER+1]),/invalid dimension/));
+test("reject shape product overflow and over-allocation",()=>assert.throws(()=>checkedNumel([1000000,1000000]),/overflow/));
+test("reject excessive tensor rank",()=>assert.throws(()=>checkedNumel(new Array(9).fill(1)),/invalid shape/));
+test("tensor add is elementwise and allocates fresh result",()=>{
+ const a=[1,2,3],b=[4,5,6],out=addTensor([3],a,b);
+ assert.deepEqual(out.data,[5,7,9]);a[0]=99;b[0]=99;assert.equal(out.data[0],5);
+ assert.ok(Object.isFrozen(out.data));assert.ok(Object.isFrozen(out.shape));
+});
+test("tensor add refuses dimension/data mismatch",()=>assert.throws(()=>addTensor([2],[1],[2,3]),/shape\/data mismatch/));
+test("tensor add refuses nonfinite data",()=>assert.throws(()=>addTensor([1],[Infinity],[1]),/finite scalar/));
+test("tensor add refuses arithmetic overflow",()=>assert.throws(()=>addTensor([1],[1e308],[1e308]),/finite scalar/));
+test("matmul rank-two row-major CPU oracle",()=>{
+ const out=matmul2d([2,3],[1,2,3,4,5,6],[3,2],[7,8,9,10,11,12]);
+ assert.deepEqual(out.shape,[2,2]);assert.deepEqual(out.data,[58,64,139,154]);
+});
+test("matmul rejects inner dimension mismatch",()=>assert.throws(()=>matmul2d([1,2],[1,2],[3,1],[1,2,3]),/inner dimension mismatch/));
+test("matmul rejects invalid rank",()=>assert.throws(()=>matmul2d([3],[1,2,3],[3,1],[1,2,3]),/rank-2/));
+test("matmul zero-width shared dimension yields zeros",()=>{
+ const out=matmul2d([2,0],[],[0,3],[]);
+ assert.deepEqual(out.data,[0,0,0,0,0,0]);
+});
+test("reverse-mode scalar derivative x*x + x",()=>{
+ const x=variable(3),y=add(multiply(x,x),x);
+ const g=gradients(y);
+ assert.equal(y.value,12);assert.equal(g.get(x),7);
+});
+test("reverse-mode shared subgraph accumulates both paths",()=>{
+ const x=variable(2),d=multiply(x,x),y=add(d,d);
+ assert.equal(gradients(y).get(x),8);
+});
+test("saved forward values and edge lists cannot mutate",()=>{
+ const x=variable(2),y=multiply(x,x);assert.ok(Object.isFrozen(x));
+ assert.ok(Object.isFrozen(y.parents));assert.ok(Object.isFrozen(y.parents[0]));
+ assert.equal(gradients(y).get(x),4);
+});
+test("forged cyclic tape rejected",()=>{
+ const bad={id:993,value:1,parents:[]};
+ bad.parents.push(Object.freeze({parent:bad,weight:1}));
+ Object.freeze(bad.parents);Object.freeze(bad);
+ assert.throws(()=>gradients(bad),/tape cycle/);
+});
+test("malformed tape rejected",()=>assert.throws(()=>gradients({value:2,parents:[]}),/malformed tape node/));
+test("analytic reverse derivative agrees with independent central difference",()=>{
+ const x=variable(1.25),y=multiply(multiply(x,x),x);
+ const analytic=gradients(y).get(x),fd=finiteDifference(t=>t*t*t,1.25);
+ assert.ok(Math.abs(analytic-fd)<1e-7);
+});
+test("invalid finite-difference step rejected",()=>assert.throws(()=>finiteDifference(x=>x*x,1,0),/invalid finite-difference step/));
+test("non-finite oracle response rejected",()=>assert.throws(()=>finiteDifference(()=>Infinity,1),/finite scalar/));
+test("SGD decreases reference linear regression loss",()=>{
+ const data=[[0,1],[1,3],[2,5],[3,7]],lr=.05;
+ let w=0,b=0,first=linearSgdEpoch(data,w,b,lr).loss,last=first;
+ for(let i=0;i<200;i++){const r=linearSgdEpoch(data,w,b,lr);w=r.w;b=r.b;last=linearSgdEpoch(data,w,b,lr).loss;}
+ assert.ok(last<first/100);
+ assert.ok(Math.abs(w-2)<.15);
+ assert.ok(Math.abs(b-1)<.3);
+});
+test("SGD refuses NaN or invalid learning rate",()=>{
+ assert.throws(()=>linearSgdEpoch([[0,1]],0,0,0),/invalid SGD/);
+ assert.throws(()=>linearSgdEpoch([[NaN,1]],0,0,.1),/finite scalar/);
+});
