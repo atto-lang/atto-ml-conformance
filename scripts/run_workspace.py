@@ -26,7 +26,7 @@ JOBS = [
     ("oreslang-tensor", "scripts/test.sh", "ORES_ML_TENSOR_SMOKE_PASS"),
     ("oreslang-autograd", "scripts/test.sh", "ORES_ML_AUTOGRAD_SMOKE_PASS"),
     ("oreslang-ml", "scripts/test.sh", "ORES_ML_TRAINING_SMOKE_PASS"),
-    ("oreslang-ml", "scripts/test-workspace.sh", "ORES_ML_AUTOGRAD_TRAINING_PASS"),
+    ("oreslang-ml", "scripts/test-workspace.sh", "ORES_ML_AUTOGRAD_TRAINING_PASS|ORES_ML_TWO_LAYER_RELU_AUTOGRAD_PASS"),
 ]
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 
@@ -79,8 +79,10 @@ def execute(repo: Path, script: str, compiler: Path, marker: str):
         stderr = err.read().decode("utf-8",errors="replace")
     require(not timed_out, "guest execution timed out")
     require(proc.returncode == 0, f"{repo.name} {script}: guest exit {proc.returncode}: {stderr[-1000:]}")
-    require(marker in stdout.splitlines(),
-            f"{repo.name} {script}: missing exact guest success marker")
+    observed = stdout.splitlines()
+    required = marker.split("|")
+    require(all(m in observed for m in required),
+            f"{repo.name} {script}: missing required guest success markers")
     return {"repo":repo.name,"script":script,"exit":proc.returncode,
             "stdout_sha256":hashlib.sha256(stdout.encode()).hexdigest(),
             "stderr_sha256":hashlib.sha256(stderr.encode()).hexdigest(),
