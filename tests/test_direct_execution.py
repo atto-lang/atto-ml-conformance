@@ -49,7 +49,12 @@ class DirectGuestDispatchTests(unittest.TestCase):
 
     def test_bogus_marker_rejected_even_on_zero_exit(self):
         self.compiler_body("printf 'INCORRECT_MARKER\\n'")
-        with self.assertRaisesRegex(ValueError, "missing required guest success markers"):
+        with self.assertRaisesRegex(ValueError, "unexpected guest stdout or missing exact success marker"):
+            execute(self.repo, "tests/smoke.ores", self.compiler, self.marker)
+
+    def test_extra_stdout_fails_even_with_correct_marker(self):
+        self.compiler_body("printf 'ORES_ML_TENSOR_SMOKE_PASS\\nextra output\\n'")
+        with self.assertRaisesRegex(ValueError, "unexpected guest stdout"):
             execute(self.repo, "tests/smoke.ores", self.compiler, self.marker)
 
     def test_nonexistent_fixture_rejected_before_launch(self):
