@@ -1,11 +1,11 @@
 {
   "schema_version": "oreslang-ml-workspace/v1",
-  "source_state": "DRAFT_PR_HEADS_NOT_RELEASE_TAGS",
+  "source_state": "DRAFT_RECONCILIATION_REFS_NOT_GUEST_TESTED",
   "repositories": {
-    "oreslang-tensor": "7c64ec2e4f8463cb4ba310791faf69e054b3a686",
-    "oreslang-autograd": "52817fb0d90713687b73c8763863f6cdf04e6df9",
-    "oreslang-ml": "dd7bd6113b05534da345c4550e6bc370521b6fca"
+    "oreslang-tensor": "6b57b0b0cbf9339219746207e6f8f35766d141dd",
+    "oreslang-autograd": "fb13c56cd353179787bf5b71d890dc33d249d3f4",
+    "oreslang-ml": "ee37063bd2345b7570435720ce1f5b91795dac08"
   },
   "compiler_artifact": "NOT_PINNED",
-  "admission": "requires operator-supplied real compiler path and human-reviewed source/binary provenance"
+  "admission": "Requires operator-supplied pinned executable real Oreslang compiler, independently verified compiler provenance, and exact clean same-org provider Git commits; never promote forged markers"
 }
