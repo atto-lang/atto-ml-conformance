@@ -1,16 +1,16 @@
 {
   "schema_version": "oreslang-ml-workspace/v1",
-  "source_state": "DRAFT_RECONCILED_P0_SOURCE_AND_CONTRACTS_NOT_GUEST_TESTED",
+  "source_state": "DRAFT_PR_HEADS_NOT_RELEASE_TAGS",
   "repositories": {
-    "oreslang-tensor": "9656a649b6a92c7e469e7fd79c534f940d5e1c44",
-    "oreslang-autograd": "ad9ece2332b1de5c7db53c4b1da5871c01835ccd",
-    "oreslang-ml": "f6e40600525c5b4f230d7cb442717252dbcf4cba"
+    "oreslang-tensor": "e8569e4d563617c39c111d1fd3ba14cfc6f438dd",
+    "oreslang-autograd": "293b23bc6bdbb54ba0d813cc1dc18922b86bbb9a",
+    "oreslang-ml": "aaf05da6f8d07ec147379840d09fb7ffb6fe5fbf"
   },
   "compiler_artifact": "NOT_PINNED",
-  "admission": "Source commit+Git tree are pinned to exact reviewed P0+contract integration; no real compiler executable authenticated; no unapproved private Git source export.",
+  "admission": "requires operator-supplied real compiler path and human-reviewed source/binary provenance",
   "source_trees": {
-    "oreslang-tensor": "bffc95aca367f4b533fa71a05fa81e7ac491a20e",
-    "oreslang-autograd": "d532bab392135092da669c8ec539047d1a7dc319",
-    "oreslang-ml": "02ed4d6d1274563ab88366e2ebd7fea7d953092e"
+    "oreslang-tensor": "34a5707a8814d173b9e5d4f4bfdb9cff193721b8",
+    "oreslang-autograd": "451a309d43cc145d189cfb5664c4a4219505b4b0",
+    "oreslang-ml": "b5a00ad852aa6f710cda83cb67304ebfb58bd22f"
   }
 }

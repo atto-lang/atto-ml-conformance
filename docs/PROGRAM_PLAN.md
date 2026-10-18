@@ -16,7 +16,7 @@ Status: architecture and acceptance criteria tracked; **not** a claim that PyTor
 | Layer | Repo owner | Near-term proof | Current admission |
 | --- | --- | --- | --- |
 | Numeric foundation | `oreslang-data-science`, `oreslang-tensor` | contiguous f64 CPU ndarray/tensor, 0D–ND, shape algebra, broadcast, strided views, matmul, reductions | `List<float>` reference algorithms only; compiler ownership pending |
-| Reverse autodiff | `oreslang-autograd` | topological tape, add/mul/ReLU, tensor VJP incl. unbroadcast, checked saved generations | scalar tape implemented in draft, not compiler-proven |
+| Reverse autodiff | `oreslang-autograd` | topological tape, add/mul/ReLU, tensor VJP incl. unbroadcast, checked saved generations | scalar tape plus explicit tensor broadcast add/mul VJPs in draft; neither compiler-proven |
 | Deep learning | `oreslang-ml` | Linear/ReLU/Sequential/MSE/SGD, two-layer end-to-end training; Adam/AdamW next | analytic affine and scalar-autograd MLP examples committed, not executable evidence |
 | Graph compiler | `oreslang-ml-compiler` **future P1** | typed ML IR, eager/compiled equivalence, constant folding, fusion, shape specialization, effect/alias barriers | repo not yet created; do not claim implemented |
 | Accelerators | `oreslang-ml-accelerators` **future P1** | CPU SIMD/multicore; one real hardware GPU backend, transfers and explicit no-fallback | repo not yet created; no physical GPU evidence |
