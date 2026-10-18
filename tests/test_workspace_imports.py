@@ -132,5 +132,16 @@ class WorkspaceImportTests(unittest.TestCase):
             validate_workspace_imports(self.root, lock_path)
 
 
+    def test_cyclic_source_import_denied(self):
+        # Both cross-repo required edges still exist: the new *local* cycle is denied.
+        self.tensor.write_text(self.tensor.read_text() +
+            "import fnc helper from './other';\n")
+        (self.root / "oreslang-tensor/src/other.ores").write_text(
+            "pub fnc helper(): int { return 0; }\n"
+            "import class TensorF64 from './tensor';\n")
+        with self.assertRaisesRegex(ValueError, "cyclic source import graph"):
+            validate_workspace_imports(self.root)
+
+
 if __name__ == "__main__":
     unittest.main()
