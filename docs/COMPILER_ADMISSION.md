@@ -24,8 +24,21 @@ Compute the digest independently of untrusted source and compare it to the separ
 
 ## Fail-closed probe sequence
 
-The runner requires a lowercase 64-hex-character SHA-256 before any guest probe. It rejects a mismatched, relative, symlinked, non-executable or source-workspace-resident compiler. It then verifies each pinned source commit and Git tree, refuses dirty checkouts, checks the complete cross-repo public-symbol/import DAG and the 14-file source-blob lock, executes the five smoke scripts with captured bounded output and timeouts, then recomputes the compiler digest to detect modification during execution.
+The runner requires a lowercase 64-hex-character SHA-256 before any guest probe. It rejects a mismatched, relative, symlinked, non-executable or source-workspace-resident compiler. It then verifies each pinned source commit and Git tree, refuses dirty checkouts, checks the complete cross-repo public-symbol/import DAG and the 14-file source-blob lock, executes the six pinned smoke programs with captured bounded output and timeouts, then recomputes the compiler digest to detect modification during execution.
 
 Even a full local success remains `EXECUTED_UNATTESTED`: exact binary hash and a marker on stdout **do not** prove source-to-binary provenance, trustworthy compiler behavior, ownership safety or Java/LLVM parity. Verify numeric results, negative semantics and backend-specific build attestation separately. Never promote the metadata-only source lock or host-only reference receipts into a compiler pass.
 
 A source-organization Actions workflow still needs to execute real steps before generating trusted source-org evidence. Incidents [#22](https://github.com/ores-truffle-oreslang/oreslang-platform-conformance/issues/22) and [#77](https://github.com/ores-truffle-oreslang/oreslang-platform-conformance/issues/77) remain open; this procedure does **not** authorize exporting private Oreslang source to a different organization for Actions minutes.
+
+## Mandatory Java CLI protocol preflight (stacked integration)
+
+The opt-in runner now calls `scripts/compiler_cli_probe.py` **after** immutable source checkout and import-closure admission, but **before** the six guest smoke programs.
+
+- `--build-info` must return strict JSON with `build_mode`, `default_execution_mode`, and `guest_execution`, matching the Java `NativeBuildMode` contract for JVM, AOT or hybrid.
+- `--check tests/smoke.ores` must succeed on the pinned Tensor source without stdout.
+- `--check` on deliberately malformed synthetic `.ores` source must fail nonzero with a diagnostic and no stdout. The negative fixture is generated outside the pinned repositories.
+- Compiler subprocesses use bounded output, 30-second deadlines and process-group cleanup; post-execution checks require clean source repositories and the original compiler SHA-256.
+
+The response includes `compiler_cli_admission` with status `CLI_BEHAVIOR_PROBED_UNATTESTED`. The seven local shell-double tests cover denial paths, **not** real Oreslang compilation or guest execution. A forged executable could still imitate the expected protocol.
+
+The Java Maven project uses Java 21 and `dev.oreslang.launcher.OresMain` as the main class. A Maven JAR is not automatically a self-contained executable; its dependencies/module classpath must be supplied or a native image built. No exact-revision compiler artifact, independent source-to-binary attestation, or successful Oreslang ML guest run has been verified. The open private-source incidents prohibit alternate-org source mirroring without the required independent authorization.
