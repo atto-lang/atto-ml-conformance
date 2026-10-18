@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "organization": "ores-truffle-oreslang",
+  "repository": "oreslang-autograd",
+  "mainSnapshotSha": "aeede1cc8f02a6afa2b733076e049d406fa0e4ac",
+  "kind": "PROPOSED_CONTRACT_NOT_IMPLEMENTATION",
+  "provides": [
+    "oreslang.autograd.scalar.v1"
+  ],
+  "requires": [
+    "oreslang.tensor.cpu.v1"
+  ],
+  "upstreams": [
+    "oreslang-common-source",
+    "oreslang-target-profiles",
+    "oreslang-tensor"
+  ],
+  "fixtureIds": [
+    "autograd/scalar-tape/v1"
+  ],
+  "hostOracleRepo": "oreslang-ml-conformance",
+  "hostOracleVerified": false,
+  "guestExecution": "NOT_EXECUTED",
+  "evidence": [],
+  "nextGate": "Implement ownership/versioned saved-forward tape and deterministic reverse topological accumulation in Oreslang; independently compare guest gradients to finite differences."
+}
