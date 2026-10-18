@@ -18,12 +18,12 @@ def classify(report):
         raise ValueError("invalid step count")
     if steps == 0:
         return "NO_STEPS"
-    if not SHA40.fullmatch(report.get("checkout_sha", "")):
-        raise ValueError("missing exact checkout identity")
-    if not SHA64.fullmatch(report.get("compiler_binary_sha256", "")):
-        raise ValueError("missing compiler binary digest")
-    if not SHA64.fullmatch(report.get("guest_source_sha256", "")):
-        raise ValueError("missing guest source digest")
+    for key, pattern in (("checkout_sha", SHA40),
+                         ("compiler_binary_sha256", SHA64),
+                         ("guest_source_sha256", SHA64)):
+        value = report.get(key)
+        if type(value) is not str or not pattern.fullmatch(value):
+            raise ValueError("invalid or missing " + key)
     if type(report.get("guest_exit")) is not int or report["guest_exit"] != 0 or report.get("timeout") is not False:
         return "EXECUTED_UNATTESTED"
     if report.get("tests_passed") is not True or type(report.get("tests_skipped")) is not int or report["tests_skipped"] != 0:
@@ -49,7 +49,8 @@ class EvidenceGateTests(unittest.TestCase):
     def test_missing_digests_and_fake_steps_fail_closed(self):
         for change in ({"executed_steps":True},{"executed_steps":-1},
                        {"checkout_sha":"z"*40},{"compiler_binary_sha256":"b"},
-                       {"guest_source_sha256":"c"*40}):
+                       {"guest_source_sha256":"c"*40},
+                       {"checkout_sha":None},{"compiler_binary_sha256":[]}):
             with self.assertRaises(ValueError):
                 classify({**self.good, **change})
     def test_skips_and_runtime_failure_cannot_upgrade(self):
