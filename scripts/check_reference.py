@@ -108,17 +108,24 @@ def compute(case):
             raise FixtureError("invalid tape count")
         values = [0.0] * count
         for i in range(count):
-            if type(op[i]) is not int or op[i] not in (0,1,2):
+            if type(op[i]) is not int or op[i] not in (0,1,2,3):
                 raise FixtureError("bad opcode")
             if op[i] == 0:
                 if left[i] != -1 or right[i] != -1 or not finite_number(leaf[i]):
                     raise FixtureError("bad leaf")
                 values[i] = leaf[i]
             else:
-                if not all(type(p) is int and 0 <= p < i for p in (left[i],right[i])):
-                    raise FixtureError("non-topological graph")
-                a, b = values[left[i]], values[right[i]]
-                values[i] = a+b if op[i] == 1 else a*b
+                if type(left[i]) is not int or not 0 <= left[i] < i:
+                    raise FixtureError("invalid left edge")
+                if op[i] == 3:
+                    if right[i] != -1:
+                        raise FixtureError("relu right-edge sentinel mismatch")
+                    values[i] = max(0.0, values[left[i]])
+                else:
+                    if type(right[i]) is not int or not 0 <= right[i] < i:
+                        raise FixtureError("invalid right edge")
+                    a, b = values[left[i]], values[right[i]]
+                    values[i] = a+b if op[i] == 1 else a*b
         root = case["root"]
         if type(root) is not int or not 0 <= root < count:
             raise FixtureError("invalid root")
@@ -132,6 +139,8 @@ def compute(case):
                 g = grads[i]
                 grads[left[i]] += g * values[right[i]]
                 grads[right[i]] += g * values[left[i]]
+            elif op[i] == 3 and values[left[i]] > 0.0:
+                grads[left[i]] += grads[i]
         return values[root], grads
     if kind == "affine_train":
         x, y = number_list(case["inputs"]), number_list(case["targets"])
