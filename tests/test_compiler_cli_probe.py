@@ -50,6 +50,21 @@ exit 88
         with self.assertRaisesRegex(ValueError, 'malformed --build-info JSON'):
             probe_compiler_cli(self.compiler, self.repo)
 
+    def test_duplicate_build_info_key_rejected(self):
+        self.fake(build_info='{"build_mode":"jvm","build_mode":"aot","default_execution_mode":"jit","guest_execution":"runtime-selected"}')
+        with self.assertRaisesRegex(ValueError, 'duplicate --build-info JSON key'):
+            probe_compiler_cli(self.compiler, self.repo)
+
+    def test_extra_build_info_key_rejected(self):
+        self.fake(build_info='{"build_mode":"jvm","default_execution_mode":"jit","guest_execution":"runtime-selected","guest_executed":true}')
+        with self.assertRaisesRegex(ValueError, 'unexpected --build-info schema'):
+            probe_compiler_cli(self.compiler, self.repo)
+
+    def test_nonfinite_build_info_rejected(self):
+        self.fake(build_info='{"build_mode":"jvm","default_execution_mode":"jit","guest_execution":NaN}')
+        with self.assertRaisesRegex(ValueError, 'nonfinite JSON'):
+            probe_compiler_cli(self.compiler, self.repo)
+
     def test_disallowed_build_mode_rejected(self):
         self.fake(build_info='{"build_mode":"untrusted","default_execution_mode":"jit","guest_execution":"runtime-selected"}')
         with self.assertRaisesRegex(ValueError, 'inconsistent build mode'):
