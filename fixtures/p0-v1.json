@@ -192,6 +192,84 @@
       "steps": 500,
       "minimum_initial_loss": 3,
       "max_loss": 0.000001
+    },
+    {
+      "id": "autograd/relu-active",
+      "kind": "autograd_scalar",
+      "opcode": [
+        0,
+        3
+      ],
+      "left": [
+        -1,
+        0
+      ],
+      "right": [
+        -1,
+        -1
+      ],
+      "leaf_values": [
+        2,
+        0
+      ],
+      "root": 1,
+      "expected_value": 2,
+      "expected_grads": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": "autograd/relu-inactive",
+      "kind": "autograd_scalar",
+      "opcode": [
+        0,
+        3
+      ],
+      "left": [
+        -1,
+        0
+      ],
+      "right": [
+        -1,
+        -1
+      ],
+      "leaf_values": [
+        -2,
+        0
+      ],
+      "root": 1,
+      "expected_value": 0,
+      "expected_grads": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "autograd/relu-zero",
+      "kind": "autograd_scalar",
+      "opcode": [
+        0,
+        3
+      ],
+      "left": [
+        -1,
+        0
+      ],
+      "right": [
+        -1,
+        -1
+      ],
+      "leaf_values": [
+        0,
+        0
+      ],
+      "root": 1,
+      "expected_value": 0,
+      "expected_grads": [
+        0,
+        1
+      ]
     }
   ]
 }
