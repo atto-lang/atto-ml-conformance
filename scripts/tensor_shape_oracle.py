@@ -96,3 +96,38 @@ def sum_to_shape(upstream_shape, upstream_values, target_shape):
     if not all(math.isfinite(v) for v in values):
         raise ShapeError("nonfinite reduction result")
     return values
+
+
+def broadcast_multiply(left_shape, left_values, right_shape, right_values):
+    """Independent coordinate oracle for broadcasting multiplication."""
+    if extent_product(left_shape) != len(left_values):
+        raise ShapeError("left shape/storage mismatch")
+    if extent_product(right_shape) != len(right_values):
+        raise ShapeError("right shape/storage mismatch")
+    out_shape = broadcast_shape(left_shape, right_shape)
+    result = [
+        left_values[input_position(left_shape, coordinate)] *
+        right_values[input_position(right_shape, coordinate)]
+        for coordinate in coordinates(out_shape)
+    ]
+    if not all(math.isfinite(v) for v in result):
+        raise ShapeError("nonfinite multiply result")
+    return out_shape, result
+
+
+def multiply_operand_gradient(left_shape, left, right_shape, right, upstream, wrt_left):
+    """Mathematical reference VJP; does not run an Oreslang backend."""
+    result_shape = broadcast_shape(left_shape, right_shape)
+    if len(upstream) != extent_product(result_shape):
+        raise ShapeError("upstream length mismatch")
+    other_shape, other = (right_shape, right) if wrt_left else (left_shape, left)
+    target_shape = left_shape if wrt_left else right_shape
+    if len(other) != extent_product(other_shape):
+        raise ShapeError("other input shape mismatch")
+    products = [
+        weight * other[input_position(other_shape, coordinate)]
+        for coordinate, weight in zip(coordinates(result_shape), upstream)
+    ]
+    if not all(math.isfinite(v) for v in products):
+        raise ShapeError("nonfinite weighted gradient")
+    return sum_to_shape(result_shape, products, target_shape)
