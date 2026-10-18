@@ -65,6 +65,14 @@ export function verifyProviderLock(lock,documents){
       JSON.stringify(doc.requires)!==JSON.stringify(needs.get(doc.repository)) ||
       !doc.fixtureIds.length || doc.upstreams.includes(doc.repository))
      fail("wrong interfaces/fixtures");
+   // Interface names alone do not establish provider edges. Require each
+   // declared interface dependency to name its actual owning repository.
+   // This remains a planned dependency, NOT evidence of a compiled import.
+   for(const requiredInterface of doc.requires){
+     const provider = [...roles.entries()].find(([,id]) => id===requiredInterface)?.[0];
+     if(!provider || provider===doc.repository || !doc.upstreams.includes(provider))
+       fail("missing upstream owner for required interface");
+   }
    satisfied.add(doc.provides[0]);
  }
  if(seen.size!==roles.size || lock.requirements.length!==satisfied.size ||
