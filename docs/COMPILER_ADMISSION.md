@@ -74,3 +74,9 @@ Git cleanliness alone is insufficient: a compiler could use `git checkout`/`git 
 
 
 **Integration evidence boundary:** the component-local synthetic tests were previously evaluated separately; the combined tree must pass its full suite at this exact merge head. The source-organization runner remains unable to produce a stepful proof, and cross-org source mirroring is denied while incidents #22 and #77 remain unresolved. Source-free Sagitta PR #30 may test runner capacity only.
+
+### Index-masking / fsmonitor hardening (2026-10-18)
+
+The earlier verifier checked exact commit/tree and Git porcelain status, but `skip-worktree` and `assume-unchanged` can hide modifications to other tracked source files from porcelain. The verifier now rejects any nonstandard `git ls-files -v -z` tracked-file flags, including those two index bits, **before every guest run**. It also overrides repository-local `core.fsmonitor` and `core.untrackedCache` while querying Git so a configured filesystem-monitor hook cannot execute or influence results. The verifier continues to require the real Git root, pinned commit SHA, pinned tree SHA and clean workspace; special/sparse-checkout index states intentionally fail closed.
+
+Four additional synthetic local Git regressions exercise changed `skip-worktree`, changed `assume-unchanged`, a nonmodified masked index entry and a configured fsmonitor hook. **27/27 focused local tests pass** (16 CLI protocol + 11 checkout identity), using source files whose Git blob hashes match PR #7. This is host-side admission evidence, not an actual Java compiler build or Oreslang guest run. A separate, independently written **source-free** synthetic Git-index model is tested in [Sagitta PR #30](https://github.com/sagitta-stack/sagitta-infra/pull/30); no ML/Oreslang private tree is copied to that carrier. Source-org hosted execution and source-export security gates remain unresolved.
