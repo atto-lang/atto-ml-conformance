@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "kind": "HOST_ORACLE_FIXTURE_CROSSWALK_NOT_GUEST_EXECUTION",
+  "p0FixturePath": "fixtures/p0-v1.json",
+  "providerLockPath": "contracts/provider-lock.v1.json",
+  "mapping": [
+    {
+      "interfaceId": "oreslang.autograd.scalar.v1",
+      "contractFixtureId": "autograd/scalar-tape/v1",
+      "p0CaseId": "autograd/diamond",
+      "coverage": "P0_SCALAR_REFERENCE_ONLY"
+    },
+    {
+      "interfaceId": "oreslang.ml.linear-sgd.v1",
+      "contractFixtureId": "ml/linear-sgd/v1",
+      "p0CaseId": "ml/affine-500",
+      "coverage": "P0_SCALAR_REFERENCE_ONLY"
+    },
+    {
+      "interfaceId": "oreslang.tensor.cpu.v1",
+      "contractFixtureId": "tensor/add/v1",
+      "p0CaseId": "tensor/add-2x2",
+      "coverage": "P0_SCALAR_REFERENCE_ONLY"
+    },
+    {
+      "interfaceId": "oreslang.tensor.cpu.v1",
+      "contractFixtureId": "tensor/matmul/v1",
+      "p0CaseId": "tensor/matmul-2x2",
+      "coverage": "P0_SCALAR_REFERENCE_ONLY"
+    },
+    {
+      "interfaceId": "oreslang.tensor.cpu.v1",
+      "contractFixtureId": "tensor/shape/v1",
+      "p0CaseId": null,
+      "coverage": "NOT_EXPLICIT_P0_CASE"
+    }
+  ],
+  "p0OnlyCases": [
+    "tensor/relu-4",
+    "tensor/sum-2x2"
+  ],
+  "guestExecuted": false
+}
