@@ -39,6 +39,6 @@ The opt-in runner now calls `scripts/compiler_cli_probe.py` **after** immutable 
 - `--check` on deliberately malformed synthetic `.ores` source must fail nonzero with a diagnostic and no stdout. The negative fixture is generated outside the pinned repositories.
 - Compiler subprocesses use bounded output, 30-second deadlines and process-group cleanup; post-execution checks require clean source repositories and the original compiler SHA-256.
 
-The response includes `compiler_cli_admission` with status `CLI_BEHAVIOR_PROBED_UNATTESTED`. The seven local shell-double tests cover denial paths, **not** real Oreslang compilation or guest execution. A forged executable could still imitate the expected protocol.
+The response includes `compiler_cli_admission` with status `CLI_BEHAVIOR_PROBED_UNATTESTED`. The ten local shell-double tests cover denial paths, **not** real Oreslang compilation or guest execution. A forged executable could still imitate the expected protocol.
 
 The Java Maven project uses Java 21 and `dev.oreslang.launcher.OresMain` as the main class. A Maven JAR is not automatically a self-contained executable; its dependencies/module classpath must be supplied or a native image built. No exact-revision compiler artifact, independent source-to-binary attestation, or successful Oreslang ML guest run has been verified. The open private-source incidents prohibit alternate-org source mirroring without the required independent authorization.
