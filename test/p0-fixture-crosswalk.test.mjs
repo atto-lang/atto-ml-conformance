@@ -19,7 +19,8 @@ test("crosswalk has five canonical interface mappings and no fabricated shape ca
  const names=crosswalk.mapping.map(m=>m.contractFixtureId);
  assert.equal(new Set(names).size,names.length);
  assert.deepEqual([...names].sort(),names);
- assert.equal(new Set(original.cases.map(c=>c.id)).size,6);
+ assert.equal(new Set(original.cases.map(c=>c.id)).size,10);
+ assert.equal(crosswalk.p0SourceFixtureCount,original.cases.length);
 });
 test("covered P0 IDs exist and unsupported P0 cases are disclosed",()=>{
  const mapped=new Set();
@@ -76,4 +77,41 @@ test("workspace requires exact source commits and does not attest a compiler",()
 test("tampered expected output is not accepted by the host oracle",()=>{
  const c=cases.get("tensor/matmul-2x2"),copy=[...c.expected];copy[0]+=100;
  assert.notDeepEqual(matmul2d(c.left.shape,c.left.values,c.right.shape,c.right.values).data,copy);
+});
+
+test("new P0 ReLU cases record active/inactive/zero subgradient convention without v1 promotion",()=>{
+ for(const [id,expected] of [["autograd/relu-active",[1,1]],["autograd/relu-inactive",[0,1]],["autograd/relu-zero",[0,1]]]){
+  const c=cases.get(id);
+  assert.equal(c.kind,"autograd_scalar");
+  const x=c.leaf_values[0],val=Math.max(0,x),g=x>0?1:0;
+  assert.equal(val,c.expected_value);
+  assert.deepEqual([g,1],c.expected_grads);
+  assert.deepEqual(expected,c.expected_grads);
+  assert.ok(crosswalk.p0OnlyCases.includes(id));
+ }
+});
+test("new two-layer ReLU reference improves MSE without asserting guest integration",()=>{
+ const c=cases.get("ml/two-layer-relu-500");
+ assert.equal(c.kind,"mlp_relu_train");
+ const [xs,ys]=[c.inputs,c.targets];
+ let [w1,b1,w2,b2]=c.initial_parameters;
+ const loss=()=>xs.reduce((sum,x,i)=>{
+  const error=w2*Math.max(0,w1*x+b1)+b2-ys[i];
+  return sum+error*error;
+ },0)/xs.length;
+ const initial=loss();
+ for(let iteration=0;iteration<c.steps;iteration++){
+  let dw1=0,db1=0,dw2=0,db2=0;
+  for(let i=0;i<xs.length;i++){
+   const x=xs[i],z=w1*x+b1,h=Math.max(0,z),err=w2*h+b2-ys[i],up=2*err;
+   dw2+=up*h;db2+=up;
+   if(z>0){dw1+=up*w2*x;db1+=up*w2;}
+  }
+  const step=c.learning_rate/xs.length;
+  w1-=step*dw1;b1-=step*db1;w2-=step*dw2;b2-=step*db2;
+  assert.ok([w1,b1,w2,b2].every(Number.isFinite));
+ }
+ assert.ok(initial>=c.minimum_initial_loss);
+ assert.ok(loss()<c.max_loss);
+ assert.ok(crosswalk.p0OnlyCases.includes(c.id));
 });
