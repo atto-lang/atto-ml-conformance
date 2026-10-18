@@ -1,6 +1,6 @@
 {
   "schema_version": "oreslang-ml-workspace/v1",
-  "source_state": "DRAFT_RECONCILED_P0_SOURCE_AND_CONTRACTS_NO_GUEST_EXECUTION",
+  "source_state": "DRAFT_RECONCILED_P0_SOURCE_AND_CONTRACTS_NOT_GUEST_TESTED",
   "repositories": {
     "oreslang-tensor": "9656a649b6a92c7e469e7fd79c534f940d5e1c44",
     "oreslang-autograd": "ad9ece2332b1de5c7db53c4b1da5871c01835ccd",
