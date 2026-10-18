@@ -81,7 +81,9 @@ class SourceTreeAdmissionTests(unittest.TestCase):
                 with patch("run_workspace.execute", side_effect=AssertionError("guest must not run")):
                     with self.assertRaisesRegex(ValueError, "import preflight"):
                         run(args)
-                    validate.assert_called_once_with(self.root)
+                    validate.assert_called_once()
+                    self.assertEqual(validate.call_args.args[0], self.root)
+                    self.assertEqual(validate.call_args.args[1].name, "ml-source-blob-lock.v1.json")
 
 
 if __name__ == "__main__":
