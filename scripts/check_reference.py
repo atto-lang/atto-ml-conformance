@@ -151,6 +151,46 @@ def compute(case):
             b -= lr*gb
         loss = math.fsum((w*xi+b-yi)**2 for xi, yi in zip(x,y))/len(x)
         return w,b,loss
+    if kind == "mlp_relu_train":
+        x, y = number_list(case["inputs"]), number_list(case["targets"])
+        p = number_list(case["initial_parameters"])
+        if len(p) != 4 or not x or len(x) != len(y):
+            raise FixtureError("invalid MLP training dimensions")
+        lr, steps = case["learning_rate"], case["steps"]
+        if not finite_number(lr) or not 0 < lr <= 1:
+            raise FixtureError("invalid MLP learning rate")
+        if type(steps) is not int or not 1 <= steps <= MAX_ELEMENTS:
+            raise FixtureError("invalid MLP training steps")
+        w1, b1, w2, b2 = p
+
+        def forward_losses(a, c, d, e):
+            return [(d * max(0.0, a * xi + c) + e - yi) ** 2
+                    for xi, yi in zip(x, y)]
+
+        initial_loss = math.fsum(forward_losses(w1, b1, w2, b2)) / len(x)
+        for _ in range(steps):
+            grads = [0.0, 0.0, 0.0, 0.0]
+            for xi, yi in zip(x, y):
+                z = w1 * xi + b1
+                h = max(0.0, z)
+                err = (w2 * h + b2) - yi
+                upstream = 2.0 * err
+                grads[2] += upstream * h
+                grads[3] += upstream
+                if z > 0.0:
+                    grads[0] += upstream * w2 * xi
+                    grads[1] += upstream * w2
+            scale = lr / len(x)
+            w1 -= scale * grads[0]
+            b1 -= scale * grads[1]
+            w2 -= scale * grads[2]
+            b2 -= scale * grads[3]
+            if not all(math.isfinite(v) for v in (w1, b1, w2, b2)):
+                raise FixtureError("nonfinite MLP training parameters")
+        final_loss = math.fsum(forward_losses(w1, b1, w2, b2)) / len(x)
+        if not math.isfinite(final_loss):
+            raise FixtureError("nonfinite MLP loss")
+        return initial_loss, final_loss
     raise FixtureError("unknown case kind: " + str(kind))
 
 def check(path):
