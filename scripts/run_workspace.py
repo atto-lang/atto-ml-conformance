@@ -20,6 +20,7 @@ import resource
 import sys
 import tempfile
 from check_workspace_imports import validate_workspace_imports
+from compiler_cli_probe import probe_compiler_cli
 
 MAX_OUTPUT = 65536
 TIMEOUT = 120
@@ -152,8 +153,11 @@ def run(args):
     import_closure = validate_workspace_imports(
         workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
     )
+    cli_probe = probe_compiler_cli(compiler, repos["oreslang-tensor"])
     jobs = [execute(repos[name],source,compiler,marker)
             for name,source,marker in JOBS]
+    require(all(not git(repo, "status", "--porcelain") for repo in repos.values()),
+            "guest compiler modified one or more pinned repositories")
     require(digest(compiler) == admitted_digest,
             "compiler binary changed during the workspace probe")
     return {"schema_version":"oreslang-ml-execution-probe/v1",
@@ -162,6 +166,7 @@ def run(args):
             "source_commits":shas,
             "source_trees":trees,
             "static_import_closure":import_closure,
+            "compiler_cli_admission":cli_probe,
             "checks":jobs,
             "source_binary_provenance_attested":False,
             "automated_backend_parity_attested":False,
