@@ -118,6 +118,8 @@ def broadcast_multiply(left_shape, left_values, right_shape, right_values):
 def multiply_operand_gradient(left_shape, left, right_shape, right, upstream, wrt_left):
     """Mathematical reference VJP; does not run an Oreslang backend."""
     result_shape = broadcast_shape(left_shape, right_shape)
+    if len(left) != extent_product(left_shape) or len(right) != extent_product(right_shape):
+        raise ShapeError("input shape/storage mismatch")
     if len(upstream) != extent_product(result_shape):
         raise ShapeError("upstream length mismatch")
     other_shape, other = (right_shape, right) if wrt_left else (left_shape, left)
