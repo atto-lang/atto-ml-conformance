@@ -1,0 +1,31 @@
+// Future optional device component boundary. NOT an implemented backend.
+package oreslang:ml-device@0.1.0;
+
+interface adapter {
+  enum numeric-dtype {
+    f32,
+    f64,
+  }
+
+  record tensor-shape {
+    dims: list<u32>,
+  }
+
+  enum adapter-error {
+    unsupported-device,
+    out-of-memory,
+    invalid-layout,
+    cancelled,
+    stale-handle,
+  }
+
+  resource buffer {
+    size: func() -> u64;
+  }
+
+  allocate: func(bytes: u64) -> result<buffer, adapter-error>;
+}
+
+world ml-device {
+  export adapter;
+}
