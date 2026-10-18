@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from run_workspace import run
+from run_workspace import run, digest
 
 
 REPOS = ("oreslang-tensor", "oreslang-autograd", "oreslang-ml")
@@ -34,7 +34,8 @@ class SourceTreeAdmissionTests(unittest.TestCase):
         self.path.write_text(json.dumps(self.doc))
         args = SimpleNamespace(workspace=str(self.root),
                                compiler=str(self.compiler),
-                               manifest=str(self.path))
+                               manifest=str(self.path),
+                               compiler_sha256=digest(self.compiler))
         with patch("run_workspace.execute", side_effect=AssertionError("guest must not run")):
             with patch("run_workspace.git", side_effect=self.fake_git):
                 return run(args)
@@ -66,7 +67,8 @@ class SourceTreeAdmissionTests(unittest.TestCase):
         self.path.write_text(json.dumps(self.doc))
         args = SimpleNamespace(workspace=str(self.root),
                                compiler=str(self.compiler),
-                               manifest=str(self.path))
+                               manifest=str(self.path),
+                               compiler_sha256=digest(self.compiler))
         def clean_pinned_git(repo, *argv):
             if argv == ("rev-parse", "HEAD"):
                 return "a" * 40
