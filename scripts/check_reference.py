@@ -161,6 +161,8 @@ def check(path):
     atol, rtol = tol["atol"], tol["rtol"]
     if not all(finite_number(v) and 0 <= v <= 0.01 for v in (atol,rtol)):
         raise FixtureError("invalid tolerance bounds")
+    if set(doc) != {"schema_version","cases","tolerance"}:
+        raise FixtureError("unknown document fields")
     seen = set()
     for case in doc["cases"]:
         if not isinstance(case, dict) or not isinstance(case.get("id"), str):
