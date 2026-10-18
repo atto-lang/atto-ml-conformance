@@ -66,9 +66,10 @@ def execute(repo: Path, source: str, compiler: Path, marker: str):
     resolved = candidate.resolve(strict=True)
     require(resolved.is_file() and repo.resolve() in resolved.parents,
             "guest source escapes the pinned repository")
-    env = os.environ.copy()
-    # No ORESLANG_BIN or shell-dispatch path can impersonate a guest run.
-    env.pop("ORESLANG_BIN", None)
+    # Explicit allowlist: do not pass CI credentials, injected Java/Python opts,
+    # LD_PRELOAD, or provider-controlled PATH to a guest process.
+    # This is environment hygiene, NOT a filesystem/process sandbox.
+    env = {"PATH": os.defpath, "LANG": "C", "LC_ALL": "C", "TZ": "UTC"}
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
         proc = subprocess.Popen([str(compiler), source], cwd=repo, env=env,
                                 stdin=subprocess.DEVNULL, stdout=out, stderr=err,
@@ -100,6 +101,26 @@ def execute(repo: Path, source: str, compiler: Path, marker: str):
             "stderr_sha256":hashlib.sha256(stderr.encode()).hexdigest(),
             "stdout_bytes":out_size,"stderr_bytes":err_size,
             "exact_marker_present":True}
+
+def verify_guest_source(repo: Path, source: str) -> str:
+    """Bind executable fixture bytes to HEAD, including skip-worktree changes."""
+    require(isinstance(source, str) and source.endswith(".ores") and
+            "\\\\" not in source and "//" not in source,
+            "invalid guest source path")
+    relative = Path(source)
+    require(not relative.is_absolute() and relative.parts and
+            all(part not in ("", ".", "..") for part in relative.parts),
+            "guest source must be a normal repository-relative path")
+    target = repo
+    for part in relative.parts:
+        target = target / part
+        require(not target.is_symlink(), "symlink in guest source path")
+    require(target.is_file(), "missing guest source file")
+    expected = git(repo, "rev-parse", "--verify", "HEAD:" + source)
+    require(bool(SHA40.fullmatch(expected)), "guest source missing from pinned Git HEAD")
+    actual = git(repo, "hash-object", "--no-filters", "--", source)
+    require(actual == expected, "guest source differs from pinned Git blob")
+    return actual
 
 def admit_compiler(compiler_path: str, expected_sha256: str, workspace: Path) -> tuple[Path, str]:
     """Hash-bind executable bytes before probe; provenance remains unverified."""
@@ -136,8 +157,11 @@ def run(args):
     for name, sha in shas.items():
         require(isinstance(sha,str) and SHA40.fullmatch(sha),
                 "invalid git commit identity")
-        repo = (workspace / name).resolve(strict=True)
-        require(repo.parent == workspace, "repository path escapes sibling workspace")
+        repo_path = workspace / name
+        require(not repo_path.is_symlink(), "repository symlink forbidden")
+        repo = repo_path.resolve(strict=True)
+        require(repo == repo_path and repo.parent == workspace,
+                "repository path escapes sibling workspace")
         require(repo.is_dir(), "missing repository directory")
         actual = git(repo,"rev-parse","HEAD")
         require(actual == sha, f"{name}: pinned source commit mismatch")
@@ -151,10 +175,28 @@ def run(args):
     import_closure = validate_workspace_imports(
         workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
     )
-    jobs = [execute(repos[name],source,compiler,marker)
-            for name,source,marker in JOBS]
-    require(digest(compiler) == admitted_digest,
-            "compiler binary changed during the workspace probe")
+    jobs = []
+    for name, source, marker in JOBS:
+        repo = repos[name]
+        source_blob = verify_guest_source(repo, source)
+        require(digest(compiler) == admitted_digest,
+                "compiler binary changed before guest execution")
+        receipt = execute(repo, source, compiler, marker)
+        require(verify_guest_source(repo, source) == source_blob,
+                "guest source changed during execution")
+        require(digest(compiler) == admitted_digest,
+                "compiler binary changed during guest execution")
+        receipt["source_git_blob"] = source_blob
+        jobs.append(receipt)
+    # Compiler execution could mutate imported Oreslang dependencies, including
+    # files whose Git status is hidden by skip-worktree. Re-evaluate locked bytes.
+    after_closure = validate_workspace_imports(
+        workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
+    )
+    require(after_closure == import_closure, "ML source import closure changed during guest execution")
+    for name, repo in repos.items():
+        require(not git(repo, "status", "--porcelain", "--untracked-files=all"),
+                f"{name}: workspace mutated during guest execution")
     return {"schema_version":"oreslang-ml-execution-probe/v1",
             "status":"EXECUTED_UNATTESTED",
             "compiler_sha256":admitted_digest,
