@@ -24,11 +24,12 @@ from check_workspace_imports import validate_workspace_imports
 MAX_OUTPUT = 65536
 TIMEOUT = 120
 JOBS = [
-    ("oreslang-tensor", "scripts/test.sh", "ORES_ML_TENSOR_SMOKE_PASS"),
-    ("oreslang-autograd", "scripts/test.sh", "ORES_ML_AUTOGRAD_SMOKE_PASS"),
-    ("oreslang-autograd", "scripts/test-workspace.sh", "ORES_ML_TENSOR_VJP_SMOKE_PASS"),
-    ("oreslang-ml", "scripts/test.sh", "ORES_ML_TRAINING_SMOKE_PASS"),
-    ("oreslang-ml", "scripts/test-workspace.sh", "ORES_ML_AUTOGRAD_TRAINING_PASS|ORES_ML_TWO_LAYER_RELU_AUTOGRAD_PASS"),
+    ("oreslang-tensor", "tests/smoke.ores", "ORES_ML_TENSOR_SMOKE_PASS"),
+    ("oreslang-autograd", "tests/smoke.ores", "ORES_ML_AUTOGRAD_SMOKE_PASS"),
+    ("oreslang-autograd", "tests/tensor_vjp_smoke.ores", "ORES_ML_TENSOR_VJP_SMOKE_PASS"),
+    ("oreslang-ml", "tests/smoke.ores", "ORES_ML_TRAINING_SMOKE_PASS"),
+    ("oreslang-ml", "examples/train_with_autograd.ores", "ORES_ML_AUTOGRAD_TRAINING_PASS"),
+    ("oreslang-ml", "examples/train_two_layer_autograd.ores", "ORES_ML_TWO_LAYER_RELU_AUTOGRAD_PASS"),
 ]
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -56,11 +57,20 @@ def limit_child_output():
     # POSIX runner: constrain actual file growth, not just post-exit reads.
     resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_OUTPUT, MAX_OUTPUT))
 
-def execute(repo: Path, script: str, compiler: Path, marker: str):
+def execute(repo: Path, source: str, compiler: Path, marker: str):
+    """Invoke the admitted compiler directly; source scripts are not proof."""
+    require(isinstance(source, str) and source.endswith(".ores"),
+            "guest source must be a .ores file")
+    candidate = repo / source
+    require(not candidate.is_symlink(), "guest source must not be a symlink")
+    resolved = candidate.resolve(strict=True)
+    require(resolved.is_file() and repo.resolve() in resolved.parents,
+            "guest source escapes the pinned repository")
     env = os.environ.copy()
-    env["ORESLANG_BIN"] = str(compiler)
+    # No ORESLANG_BIN or shell-dispatch path can impersonate a guest run.
+    env.pop("ORESLANG_BIN", None)
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
-        proc = subprocess.Popen(["sh", script], cwd=repo, env=env,
+        proc = subprocess.Popen([str(compiler), source], cwd=repo, env=env,
                                 stdin=subprocess.DEVNULL, stdout=out, stderr=err,
                                 start_new_session=(os.name == "posix"), preexec_fn=limit_child_output)
         timed_out = False
@@ -81,12 +91,12 @@ def execute(repo: Path, script: str, compiler: Path, marker: str):
         stdout = out.read().decode("utf-8",errors="replace")
         stderr = err.read().decode("utf-8",errors="replace")
     require(not timed_out, "guest execution timed out")
-    require(proc.returncode == 0, f"{repo.name} {script}: guest exit {proc.returncode}: {stderr[-1000:]}")
+    require(proc.returncode == 0, f"{repo.name} {source}: guest exit {proc.returncode}: {stderr[-1000:]}")
     observed = stdout.splitlines()
     required = marker.split("|")
     require(all(m in observed for m in required),
-            f"{repo.name} {script}: missing required guest success markers")
-    return {"repo":repo.name,"script":script,"exit":proc.returncode,
+            f"{repo.name} {source}: missing required guest success markers")
+    return {"repo":repo.name,"source":source,"exit":proc.returncode,
             "stdout_sha256":hashlib.sha256(stdout.encode()).hexdigest(),
             "stderr_sha256":hashlib.sha256(stderr.encode()).hexdigest(),
             "stdout_bytes":out_size,"stderr_bytes":err_size,
@@ -142,8 +152,8 @@ def run(args):
     import_closure = validate_workspace_imports(
         workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
     )
-    jobs = [execute(repos[name],script,compiler,marker)
-            for name,script,marker in JOBS]
+    jobs = [execute(repos[name],source,compiler,marker)
+            for name,source,marker in JOBS]
     require(digest(compiler) == admitted_digest,
             "compiler binary changed during the workspace probe")
     return {"schema_version":"oreslang-ml-execution-probe/v1",
