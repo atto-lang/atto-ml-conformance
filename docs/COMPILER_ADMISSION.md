@@ -39,6 +39,14 @@ The opt-in runner now calls `scripts/compiler_cli_probe.py` **after** immutable 
 - `--check` on deliberately malformed synthetic `.ores` source must fail nonzero with a diagnostic and no stdout. The negative fixture is generated outside the pinned repositories.
 - Compiler subprocesses use bounded output, 30-second deadlines and process-group cleanup; post-execution checks require clean source repositories and the original compiler SHA-256.
 
-The response includes `compiler_cli_admission` with status `CLI_BEHAVIOR_PROBED_UNATTESTED`. The ten local shell-double tests cover denial paths, **not** real Oreslang compilation or guest execution. A forged executable could still imitate the expected protocol.
+The response includes `compiler_cli_admission` with status `CLI_BEHAVIOR_PROBED_UNATTESTED`. The fifteen local shell-double tests cover denial paths and JVM/AOT/hybrid mode acceptance, **not** real Oreslang compilation or guest execution. A forged executable could still imitate the expected protocol.
 
 The Java Maven project uses Java 21 and `dev.oreslang.launcher.OresMain` as the main class. A Maven JAR is not automatically a self-contained executable; its dependencies/module classpath must be supplied or a native image built. No exact-revision compiler artifact, independent source-to-binary attestation, or successful Oreslang ML guest run has been verified. The open private-source incidents prohibit alternate-org source mirroring without the required independent authorization.
+
+### Hardening audit: syntax diagnostics and inter-job integrity
+
+A generic nonzero exit is insufficient to prove a negative compile: it might be a usage error (`2`), missing dependency, crash, or unrelated stderr. The negative syntax preflight now requires exactly exit status `1`, no stdout, and a Java `OresMain`-compatible, **absolute negative fixture path plus positive line/column and `error:`** on stderr. `--build-info` also must not emit stderr. Generic errors and stdout contamination are explicitly denied. These are behavioral admissions, not compiler identity/provenance attestation.
+
+A successful CLI probe does not permit unchecked subsequent execution. The workspace runner immediately re-verifies compiler SHA-256 and source cleanliness, and repeats both checks before and after **each** of the six guest smoke programs. The residual path-execution time-of-check/time-of-use gap and forged executable behavior remain unproven trust assumptions; approved toolchain custody and a separate attested execution environment are required for release evidence.
+
+An independent synthetic oracle is staged at [Sagitta PR #30](https://github.com/sagitta-stack/sagitta-infra/pull/30). It contains no private source, secrets, checkout, or real compiler; its GitHub Actions receipt cannot qualify as exact-source CI or fulfill the pending protected-main security approval. The canonical cross-org publisher remains disabled while incident reviews [#22](https://github.com/ores-truffle-oreslang/oreslang-platform-conformance/issues/22) and [#77](https://github.com/ores-truffle-oreslang/oreslang-platform-conformance/issues/77) remain open.
