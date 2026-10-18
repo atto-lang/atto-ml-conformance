@@ -14,8 +14,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
-      - name: Run independent reference fixtures
-        run: npm run test:oracle
+      - name: Run independent reference fixtures and pinned contract checks
+        run: npm test
       - name: Refuse actual compiler conformance claims
         run: |
           echo "HOST_ORACLE_ONLY: no Oreslang compiler or guest executed"
