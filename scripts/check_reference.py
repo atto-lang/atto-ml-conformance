@@ -100,6 +100,13 @@ def compute(case):
         m, k, n = sa[0], sa[1], sb[1]
         return [math.fsum(a[r*k+p] * b[p*n+c] for p in range(k))
                 for r in range(m) for c in range(n)]
+    if kind == "tensor_broadcast_add":
+        first_shape, first = tensor(case["left"])
+        other_shape, other = tensor(case["right"])
+        return broadcast_add(first_shape, first, other_shape, other)
+    if kind == "tensor_sum_to_shape":
+        source_shape, source = tensor(case["upstream"])
+        return sum_to_shape(source_shape, source, case["target_shape"])
     if kind == "autograd_scalar":
         op, left, right, leaf = (case[f] for f in ("opcode","left","right","leaf_values"))
         if not all(isinstance(x, list) for x in (op,left,right,leaf)):
