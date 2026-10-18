@@ -12,7 +12,7 @@ FIXTURE = ROOT / "fixtures/p0-v1.json"
 
 class ReferenceTests(unittest.TestCase):
     def test_golden(self):
-        self.assertEqual(check(FIXTURE), 6)
+        self.assertEqual(check(FIXTURE), 7)
 
     def test_tampered_expected_rejected(self):
         doc = json.loads(FIXTURE.read_text())
