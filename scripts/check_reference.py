@@ -228,7 +228,14 @@ def check(path):
             raise FixtureError("duplicate case ID")
         seen.add(case["id"])
         got = compute(case)
-        if case["kind"] == "autograd_scalar":
+        if case["kind"] == "tensor_broadcast_add":
+            shape, values = got
+            if shape != case["expected_shape"]:
+                raise FixtureError("broadcast output shape mismatch")
+            approx(values, case["expected"], atol, rtol)
+        elif case["kind"] == "tensor_sum_to_shape":
+            approx(got, case["expected"], atol, rtol)
+        elif case["kind"] == "autograd_scalar":
             value, grads = got
             approx(value,case["expected_value"],atol,rtol)
             approx(grads,case["expected_grads"],atol,rtol)
