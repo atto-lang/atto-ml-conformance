@@ -23,10 +23,14 @@ jobs:
           python-version: '3.12'
       - name: Run Node host references and provider contract tests
         shell: bash
-        run: npm test 2>&1 | tee "$RUNNER_TEMP/node-tap.log"
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee "$RUNNER_TEMP/node-tap.log"
       - name: Run Python host reference and security tests
         shell: bash
-        run: python3 -m unittest discover -s tests -p 'test_*.py' -v 2>&1 | tee "$RUNNER_TEMP/python-unittest.log"
+        run: |
+          set -o pipefail
+          python3 -m unittest discover -s tests -p 'test_*.py' -v 2>&1 | tee "$RUNNER_TEMP/python-unittest.log"
       - name: Verify independent Python fixture oracle
         shell: bash
         run: |
