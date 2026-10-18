@@ -1,5 +1,7 @@
 """Host-only adversarial proof of *direct* CLI dispatch, not Oreslang compilation."""
 import sys
+import os
+from unittest.mock import patch
 import tempfile
 import unittest
 from pathlib import Path
@@ -56,6 +58,25 @@ class DirectGuestDispatchTests(unittest.TestCase):
         self.compiler_body("printf 'ORES_ML_TENSOR_SMOKE_PASS\\nextra output\\n'")
         with self.assertRaisesRegex(ValueError, "unexpected guest stdout"):
             execute(self.repo, "tests/smoke.ores", self.compiler, self.marker)
+
+    def test_guest_does_not_inherit_ci_tokens_or_loader_injection(self):
+        self.compiler_body(
+            'test -z "${GITHUB_TOKEN+x}" || exit 11\n'
+            'test -z "${AWS_SECRET_ACCESS_KEY+x}" || exit 12\n'
+            'test -z "${JAVA_TOOL_OPTIONS+x}" || exit 13\n'
+            'test -z "${ORESLANG_BIN+x}" || exit 14\n'
+            'test -z "${LD_LIBRARY_PATH+x}" || exit 15\n'
+            'printf "ORES_ML_TENSOR_SMOKE_PASS\\n"'
+        )
+        with patch.dict(os.environ, {
+            "GITHUB_TOKEN": "synthetic-canary",
+            "AWS_SECRET_ACCESS_KEY": "synthetic-canary",
+            "JAVA_TOOL_OPTIONS": "-Dsynthetic.canary=yes",
+            "ORESLANG_BIN": "/tmp/synthetic-wrong-compiler",
+            "LD_LIBRARY_PATH": "/tmp/synthetic-inject",
+        }):
+            self.assertEqual(execute(self.repo, "tests/smoke.ores", self.compiler,
+                                     self.marker)["exit"], 0)
 
     def test_nonexistent_fixture_rejected_before_launch(self):
         self.compiler_body("exit 0")
