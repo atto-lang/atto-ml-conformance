@@ -74,6 +74,19 @@ test("workspace requires exact source commits and does not attest a compiler",()
  assert.equal(providerLock.guestEvidence,"NOT_EXECUTED");
  assert.equal(providerLock.sourceExportsAllowed,false);
 });
+test("workspace binds the immutable provider trees and rejects promotion",()=>{
+ const names=["oreslang-autograd","oreslang-ml","oreslang-tensor"];
+ assert.deepEqual(Object.keys(workspace.source_trees).sort(),names);
+ assert.deepEqual(Object.keys(workspace.repositories).sort(),names);
+ assert.equal(workspace.compiler_artifact,"NOT_PINNED");
+ assert.match(workspace.source_state,/NOT_GUEST_TESTED/);
+ for(const name of names){
+   const commit=workspace.repositories[name],tree=workspace.source_trees[name];
+   assert.match(commit,/^[a-f0-9]{40}$/);
+   assert.match(tree,/^[a-f0-9]{40}$/);
+   assert.notEqual(commit,tree);
+ }
+});
 test("tampered expected output is not accepted by the host oracle",()=>{
  const c=cases.get("tensor/matmul-2x2"),copy=[...c.expected];copy[0]+=100;
  assert.notDeepEqual(matmul2d(c.left.shape,c.left.values,c.right.shape,c.right.values).data,copy);
