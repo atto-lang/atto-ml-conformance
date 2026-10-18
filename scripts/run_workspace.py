@@ -21,6 +21,7 @@ import sys
 import tempfile
 from check_workspace_imports import validate_workspace_imports
 from compiler_cli_probe import probe_compiler_cli
+from verify_pinned_checkouts import verify_pinned_checkouts
 
 MAX_OUTPUT = 65536
 TIMEOUT = 120
@@ -158,19 +159,16 @@ def run(args):
     # build-info/--check. Do not launch a guest job after observed drift.
     require(digest(compiler) == admitted_digest,
             "compiler changed during CLI preflight")
-    require(all(not git(repo, "status", "--porcelain") for repo in repos.values()),
-            "CLI preflight modified one or more pinned repositories")
+    verify_pinned_checkouts(repos, shas, trees)
     jobs = []
     for name, source, marker in JOBS:
         require(digest(compiler) == admitted_digest,
                 "compiler changed before guest execution")
-        require(all(not git(repo, "status", "--porcelain") for repo in repos.values()),
-                "pinned source changed before guest execution")
+        verify_pinned_checkouts(repos, shas, trees)
         jobs.append(execute(repos[name], source, compiler, marker))
         require(digest(compiler) == admitted_digest,
                 "compiler changed during guest execution")
-        require(all(not git(repo, "status", "--porcelain") for repo in repos.values()),
-                "guest compiler modified one or more pinned repositories")
+        verify_pinned_checkouts(repos, shas, trees)
     return {"schema_version":"oreslang-ml-execution-probe/v1",
             "status":"EXECUTED_UNATTESTED",
             "compiler_sha256":admitted_digest,
