@@ -1,0 +1,12 @@
+{
+  "name": "@oreslang/ml-conformance",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test:oracle": "node --test reference/test/*.test.mjs",
+    "test": "node --test reference/test/*.test.mjs"
+  }
+}
