@@ -221,6 +221,14 @@ def check(path):
             approx(b,case["expected_bias"],0.01,0.01)
             if not finite_number(case["max_loss"]) or loss > case["max_loss"]:
                 raise FixtureError("training did not converge")
+        elif case["kind"] == "mlp_relu_train":
+            initial_loss, final_loss = got
+            minimum = case["minimum_initial_loss"]
+            maximum = case["max_loss"]
+            if not finite_number(minimum) or not finite_number(maximum):
+                raise FixtureError("invalid MLP loss bounds")
+            if not initial_loss >= minimum or not final_loss < maximum:
+                raise FixtureError("MLP convergence fixture failed")
         else:
             approx(got,case["expected"],atol,rtol)
     return len(seen)
