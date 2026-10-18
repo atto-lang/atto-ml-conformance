@@ -31,6 +31,7 @@ JOBS = [
     ("oreslang-ml", "scripts/test-workspace.sh", "ORES_ML_AUTOGRAD_TRAINING_PASS|ORES_ML_TWO_LAYER_RELU_AUTOGRAD_PASS"),
 ]
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 def digest(path: Path) -> str:
     h = hashlib.sha256()
@@ -91,11 +92,26 @@ def execute(repo: Path, script: str, compiler: Path, marker: str):
             "stdout_bytes":out_size,"stderr_bytes":err_size,
             "exact_marker_present":True}
 
+def admit_compiler(compiler_path: str, expected_sha256: str, workspace: Path) -> tuple[Path, str]:
+    """Hash-bind executable bytes before probe; provenance remains unverified."""
+    require(isinstance(expected_sha256, str) and SHA256.fullmatch(expected_sha256),
+            "explicit --compiler-sha256 is required (64 lowercase hex)")
+    supplied = Path(compiler_path)
+    require(supplied.is_absolute() and not supplied.is_symlink(),
+            "compiler must be an absolute non-symlink executable")
+    compiler = supplied.resolve(strict=True)
+    require(compiler.is_file() and os.access(compiler, os.X_OK),
+            "compiler must be an absolute executable file")
+    require(compiler != workspace and workspace not in compiler.parents,
+            "compiler executable must be outside mutable source workspace")
+    actual = digest(compiler)
+    require(actual == expected_sha256, "compiler binary SHA-256 mismatch")
+    return compiler, actual
+
 def run(args):
     workspace = Path(args.workspace).resolve(strict=True)
-    compiler = Path(args.compiler).resolve(strict=True)
-    require(compiler.is_file() and os.access(compiler,os.X_OK),
-            "compiler must be an absolute executable file")
+    compiler, admitted_digest = admit_compiler(
+        args.compiler, getattr(args, "compiler_sha256", None), workspace)
     doc = json.loads(Path(args.manifest).read_text())
     require(doc.get("schema_version") == "oreslang-ml-workspace/v1",
             "unknown manifest version")
@@ -128,9 +144,11 @@ def run(args):
     )
     jobs = [execute(repos[name],script,compiler,marker)
             for name,script,marker in JOBS]
+    require(digest(compiler) == admitted_digest,
+            "compiler binary changed during the workspace probe")
     return {"schema_version":"oreslang-ml-execution-probe/v1",
             "status":"EXECUTED_UNATTESTED",
-            "compiler_sha256":digest(compiler),
+            "compiler_sha256":admitted_digest,
             "source_commits":shas,
             "source_trees":trees,
             "static_import_closure":import_closure,
@@ -143,6 +161,8 @@ if __name__=="__main__":
     p=argparse.ArgumentParser()
     p.add_argument("--workspace",required=True)
     p.add_argument("--compiler",required=True)
+    p.add_argument("--compiler-sha256",required=True,
+                   help="Exact SHA-256 of independently reviewed compiler executable")
     p.add_argument("--manifest",default="manifests/p0-workspace.json")
     args=p.parse_args()
     try:
