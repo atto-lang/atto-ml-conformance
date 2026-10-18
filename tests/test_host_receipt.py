@@ -1,4 +1,7 @@
 """Synthetic log tests. No Oreslang compiler or source checkout is involved."""
+import json
+import subprocess
+import tempfile
 import sys
 from pathlib import Path
 import unittest
@@ -64,6 +67,38 @@ class HostReceiptTests(unittest.TestCase):
     def test_duplicate_python(self):
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             parse_python_summary(PYTHON + PYTHON)
+
+
+    def test_cli_binds_real_temp_git_commit_and_tree(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            subprocess.run(["git", "init", "-q", d], check=True)
+            (root / "test-fixture.txt").write_text("independently authored synthetic text\n")
+            subprocess.run(["git", "-C", d, "add", "test-fixture.txt"], check=True)
+            subprocess.run(["git", "-C", d, "-c", "user.name=Test",
+                            "-c", "user.email=test@example.invalid", "commit", "-q", "-m", "fixture"], check=True)
+            head = subprocess.check_output(["git", "-C", d, "rev-parse", "HEAD"], text=True).strip()
+            tree = subprocess.check_output(["git", "-C", d, "rev-parse", "HEAD^{tree}"], text=True).strip()
+            (root / "node.log").write_text(NODE)
+            (root / "python.log").write_text(PYTHON)
+            (root / "reference.ok").write_text("REFERENCE_PASS\n")
+            script = Path(__file__).resolve().parents[1] / "scripts" / "host_receipt.py"
+            arguments = [sys.executable, str(script), "--expected-sha", head,
+                         "--node-log", "node.log", "--python-log", "python.log",
+                         "--reference-marker", "reference.ok", "--output", "receipt.json"]
+            succeeded = subprocess.run(arguments, cwd=root, capture_output=True, text=True)
+            self.assertEqual(succeeded.returncode, 0, succeeded.stderr)
+            receipt = json.loads((root / "receipt.json").read_text())
+            self.assertEqual(receipt["source_commit"], head)
+            self.assertEqual(receipt["source_git_tree"], tree)
+            self.assertEqual(receipt["evidence_scope"], "HOST_REFERENCE_ONLY")
+            self.assertFalse(receipt["private_source_transferred"])
+            self.assertFalse(receipt["native_compiler_executed"])
+            (root / "receipt.json").unlink()
+            arguments[arguments.index(head)] = "f" * 40
+            denied = subprocess.run(arguments, cwd=root, capture_output=True, text=True)
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertFalse((root / "receipt.json").exists())
 
 
 if __name__ == "__main__":
