@@ -7,6 +7,7 @@
   },
   "scripts": {
     "test:oracle": "node --test reference/test/*.test.mjs",
-    "test": "node --test reference/test/*.test.mjs"
+    "test": "node --test reference/test/*.test.mjs test/*.test.mjs",
+    "test:contracts": "node --test test/*.test.mjs"
   }
 }
