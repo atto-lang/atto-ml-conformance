@@ -2,14 +2,14 @@
   "schema_version": "oreslang-ml-workspace/v1",
   "source_state": "DRAFT_PR_HEADS_NOT_RELEASE_TAGS",
   "repositories": {
-    "oreslang-tensor": "76bb184b3ce0608f3739308014ffae25aa04fb07",
+    "oreslang-tensor": "e8569e4d563617c39c111d1fd3ba14cfc6f438dd",
     "oreslang-autograd": "293b23bc6bdbb54ba0d813cc1dc18922b86bbb9a",
     "oreslang-ml": "aaf05da6f8d07ec147379840d09fb7ffb6fe5fbf"
   },
   "compiler_artifact": "NOT_PINNED",
   "admission": "requires operator-supplied real compiler path and human-reviewed source/binary provenance",
   "source_trees": {
-    "oreslang-tensor": "ea6f54048142af8be026fce7855be8c2a40a0efe",
+    "oreslang-tensor": "34a5707a8814d173b9e5d4f4bfdb9cff193721b8",
     "oreslang-autograd": "451a309d43cc145d189cfb5664c4a4219505b4b0",
     "oreslang-ml": "b5a00ad852aa6f710cda83cb67304ebfb58bd22f"
   }
