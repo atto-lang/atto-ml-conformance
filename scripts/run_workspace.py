@@ -19,6 +19,7 @@ import subprocess
 import resource
 import sys
 import tempfile
+from check_workspace_imports import validate_workspace_imports
 
 MAX_OUTPUT = 65536
 TIMEOUT = 120
@@ -120,6 +121,9 @@ def run(args):
         require(not git(repo,"status","--porcelain"),
                 f"{name}: dirty or untracked working tree")
         repos[name] = repo
+    # Resolve cross-repo source imports and public symbols only after all three
+    # checked-out commits, trees and cleanliness have been verified.
+    import_closure = validate_workspace_imports(workspace)
     jobs = [execute(repos[name],script,compiler,marker)
             for name,script,marker in JOBS]
     return {"schema_version":"oreslang-ml-execution-probe/v1",
@@ -127,6 +131,7 @@ def run(args):
             "compiler_sha256":digest(compiler),
             "source_commits":shas,
             "source_trees":trees,
+            "static_import_closure":import_closure,
             "checks":jobs,
             "source_binary_provenance_attested":False,
             "automated_backend_parity_attested":False,
