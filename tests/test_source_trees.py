@@ -62,5 +62,27 @@ class SourceTreeAdmissionTests(unittest.TestCase):
             self.attempt()
 
 
+    def test_import_closure_denies_execution_after_valid_commit_and_tree_checks(self):
+        self.path.write_text(json.dumps(self.doc))
+        args = SimpleNamespace(workspace=str(self.root),
+                               compiler=str(self.compiler),
+                               manifest=str(self.path))
+        def clean_pinned_git(repo, *argv):
+            if argv == ("rev-parse", "HEAD"):
+                return "a" * 40
+            if argv == ("show", "-s", "--format=%T", "HEAD"):
+                return "b" * 40
+            if argv == ("status", "--porcelain"):
+                return ""
+            raise AssertionError("unexpected Git probe")
+        with patch("run_workspace.git", side_effect=clean_pinned_git):
+            with patch("run_workspace.validate_workspace_imports",
+                       side_effect=ValueError("ML import preflight denied")) as validate:
+                with patch("run_workspace.execute", side_effect=AssertionError("guest must not run")):
+                    with self.assertRaisesRegex(ValueError, "import preflight"):
+                        run(args)
+                    validate.assert_called_once_with(self.root)
+
+
 if __name__ == "__main__":
     unittest.main()
