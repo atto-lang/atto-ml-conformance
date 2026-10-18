@@ -2,9 +2,9 @@
   "schema_version": "oreslang-ml-workspace/v1",
   "source_state": "DRAFT_PR_HEADS_NOT_RELEASE_TAGS",
   "repositories": {
-    "oreslang-tensor": "a458198d24b0b84f84152181914451b7f357d3ca",
-    "oreslang-autograd": "9d1a2f302e72e1e9f47204582a57fdd0a30bcbb5",
-    "oreslang-ml": "2dfae9acba4074a7424d726ee28a95d9f36a128d"
+    "oreslang-tensor": "70d6b3d3c220e947f3c1c2b1c94fa43b903ad9b8",
+    "oreslang-autograd": "3da8f9b2bc9ee7edb9868f711d806ebbfdc4944b",
+    "oreslang-ml": "6baa2d71c986c91174ccf64fe19e9e54722c7847"
   },
   "compiler_artifact": "NOT_PINNED",
   "admission": "requires operator-supplied real compiler path and human-reviewed source/binary provenance"
