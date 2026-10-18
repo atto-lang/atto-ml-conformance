@@ -25,6 +25,7 @@ TIMEOUT = 120
 JOBS = [
     ("oreslang-tensor", "scripts/test.sh", "ORES_ML_TENSOR_SMOKE_PASS"),
     ("oreslang-autograd", "scripts/test.sh", "ORES_ML_AUTOGRAD_SMOKE_PASS"),
+    ("oreslang-autograd", "scripts/test-workspace.sh", "ORES_ML_TENSOR_VJP_SMOKE_PASS"),
     ("oreslang-ml", "scripts/test.sh", "ORES_ML_TRAINING_SMOKE_PASS"),
     ("oreslang-ml", "scripts/test-workspace.sh", "ORES_ML_AUTOGRAD_TRAINING_PASS|ORES_ML_TWO_LAYER_RELU_AUTOGRAD_PASS"),
 ]
@@ -100,6 +101,11 @@ def run(args):
     shas = doc.get("repositories")
     require(isinstance(shas,dict) and set(shas)=={"oreslang-tensor","oreslang-autograd","oreslang-ml"},
             "manifest must pin all three producer repos exactly")
+    trees = doc.get("source_trees")
+    require(isinstance(trees, dict) and set(trees) == set(shas),
+            "manifest must pin each original source Git tree")
+    require(all(isinstance(tree, str) and SHA40.fullmatch(tree)
+                for tree in trees.values()), "invalid source tree identity")
     repos = {}
     for name, sha in shas.items():
         require(isinstance(sha,str) and SHA40.fullmatch(sha),
@@ -109,6 +115,8 @@ def run(args):
         require(repo.is_dir(), "missing repository directory")
         actual = git(repo,"rev-parse","HEAD")
         require(actual == sha, f"{name}: pinned source commit mismatch")
+        tree = git(repo, "show", "-s", "--format=%T", "HEAD")
+        require(tree == trees[name], f"{name}: tree mismatch")
         require(not git(repo,"status","--porcelain"),
                 f"{name}: dirty or untracked working tree")
         repos[name] = repo
@@ -118,6 +126,7 @@ def run(args):
             "status":"EXECUTED_UNATTESTED",
             "compiler_sha256":digest(compiler),
             "source_commits":shas,
+            "source_trees":trees,
             "checks":jobs,
             "source_binary_provenance_attested":False,
             "automated_backend_parity_attested":False,

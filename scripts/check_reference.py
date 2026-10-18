@@ -10,6 +10,7 @@ import argparse
 import json
 import math
 from pathlib import Path
+from tensor_shape_oracle import broadcast_add, sum_to_shape
 
 MAX_BYTES = 131072
 MAX_ELEMENTS = 10000
@@ -99,12 +100,19 @@ def compute(case):
         m, k, n = sa[0], sa[1], sb[1]
         return [math.fsum(a[r*k+p] * b[p*n+c] for p in range(k))
                 for r in range(m) for c in range(n)]
+    if kind == "tensor_broadcast_add":
+        first_shape, first = tensor(case["left"])
+        other_shape, other = tensor(case["right"])
+        return broadcast_add(first_shape, first, other_shape, other)
+    if kind == "tensor_sum_to_shape":
+        source_shape, source = tensor(case["upstream"])
+        return sum_to_shape(source_shape, source, case["target_shape"])
     if kind == "autograd_scalar":
         op, left, right, leaf = (case[f] for f in ("opcode","left","right","leaf_values"))
         if not all(isinstance(x, list) for x in (op,left,right,leaf)):
             raise FixtureError("invalid tape arrays")
         count = len(op)
-        if not 1 <= count <= MAX_ELEMENTS or not all(len(xs) == count for xs in (left,right,leaf)):
+        if not 1 <= count <= 8192 or not all(len(xs) == count for xs in (left,right,leaf)):
             raise FixtureError("invalid tape count")
         values = [0.0] * count
         for i in range(count):
@@ -220,7 +228,14 @@ def check(path):
             raise FixtureError("duplicate case ID")
         seen.add(case["id"])
         got = compute(case)
-        if case["kind"] == "autograd_scalar":
+        if case["kind"] == "tensor_broadcast_add":
+            shape, values = got
+            if shape != case["expected_shape"]:
+                raise FixtureError("broadcast output shape mismatch")
+            approx(values, case["expected"], atol, rtol)
+        elif case["kind"] == "tensor_sum_to_shape":
+            approx(got, case["expected"], atol, rtol)
+        elif case["kind"] == "autograd_scalar":
             value, grads = got
             approx(value,case["expected_value"],atol,rtol)
             approx(grads,case["expected_grads"],atol,rtol)

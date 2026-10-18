@@ -1,11 +1,16 @@
 {
   "schema_version": "oreslang-ml-workspace/v1",
-  "source_state": "DRAFT_STACKED_P0_PLUS_V1_CONTRACT_NOT_GUEST_TESTED",
+  "source_state": "DRAFT_PR_HEADS_NOT_RELEASE_TAGS",
   "repositories": {
-    "oreslang-tensor": "3ba3f98cb8b6cc65666e4d4a0369356d33ef7e13",
-    "oreslang-autograd": "57ff941b8362bcdaa2150054ba666fc1a6108362",
-    "oreslang-ml": "fb1a42aa72e3ad09cdf5f74b888c0b0cfe4d720e"
+    "oreslang-tensor": "76bb184b3ce0608f3739308014ffae25aa04fb07",
+    "oreslang-autograd": "17b3036e27bb545a47152c797436591d6272e5fb",
+    "oreslang-ml": "aaf05da6f8d07ec147379840d09fb7ffb6fe5fbf"
   },
   "compiler_artifact": "NOT_PINNED",
-  "admission": "Exact stacked P0 source+contract heads only; compiler_artifact NOT_PINNED and no actual guest evidence. Requires trusted source-org run with explicit verified compiler provenance."
+  "admission": "requires operator-supplied real compiler path and human-reviewed source/binary provenance",
+  "source_trees": {
+    "oreslang-tensor": "ea6f54048142af8be026fce7855be8c2a40a0efe",
+    "oreslang-autograd": "b55acadf0ec0c377dfa8427f683c3a8801337162",
+    "oreslang-ml": "b5a00ad852aa6f710cda83cb67304ebfb58bd22f"
+  }
 }
