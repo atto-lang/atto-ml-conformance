@@ -112,7 +112,7 @@ def compute(case):
         if not all(isinstance(x, list) for x in (op,left,right,leaf)):
             raise FixtureError("invalid tape arrays")
         count = len(op)
-        if not 1 <= count <= MAX_ELEMENTS or not all(len(xs) == count for xs in (left,right,leaf)):
+        if not 1 <= count <= 8192 or not all(len(xs) == count for xs in (left,right,leaf)):
             raise FixtureError("invalid tape count")
         values = [0.0] * count
         for i in range(count):
