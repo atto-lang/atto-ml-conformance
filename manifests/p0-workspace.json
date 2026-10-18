@@ -1,16 +1,16 @@
 {
   "schema_version": "oreslang-ml-workspace/v1",
-  "source_state": "DRAFT_PR_HEADS_NOT_RELEASE_TAGS",
+  "source_state": "DRAFT_RECONCILED_P0_SOURCE_AND_CONTRACTS_NOT_GUEST_TESTED",
   "repositories": {
-    "oreslang-tensor": "e8569e4d563617c39c111d1fd3ba14cfc6f438dd",
-    "oreslang-autograd": "293b23bc6bdbb54ba0d813cc1dc18922b86bbb9a",
-    "oreslang-ml": "aaf05da6f8d07ec147379840d09fb7ffb6fe5fbf"
+    "oreslang-tensor": "a6056f358a6ce91f8c86ce93e9040cff49be31f5",
+    "oreslang-autograd": "d4d5f451f97651088ecbad8c9acf64440380c06f",
+    "oreslang-ml": "f6e40600525c5b4f230d7cb442717252dbcf4cba"
   },
   "compiler_artifact": "NOT_PINNED",
-  "admission": "requires operator-supplied real compiler path and human-reviewed source/binary provenance",
+  "admission": "Source commit and tree pins are immutable Git objects; readonly metadata matches do not establish authorized source export, build provenance, real compiler guest results, or release readiness.",
   "source_trees": {
-    "oreslang-tensor": "34a5707a8814d173b9e5d4f4bfdb9cff193721b8",
-    "oreslang-autograd": "451a309d43cc145d189cfb5664c4a4219505b4b0",
-    "oreslang-ml": "b5a00ad852aa6f710cda83cb67304ebfb58bd22f"
+    "oreslang-tensor": "3ef132b3c07011d125034bbd61f5304054bf7e08",
+    "oreslang-autograd": "e85bcc2c2fb658e8418b24c5ca3e473715bea236",
+    "oreslang-ml": "02ed4d6d1274563ab88366e2ebd7fea7d953092e"
   }
 }
