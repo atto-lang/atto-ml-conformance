@@ -36,8 +36,14 @@
     }
   ],
   "p0OnlyCases": [
+    "autograd/relu-active",
+    "autograd/relu-inactive",
+    "autograd/relu-zero",
+    "ml/two-layer-relu-500",
     "tensor/relu-4",
     "tensor/sum-2x2"
   ],
-  "guestExecuted": false
+  "guestExecuted": false,
+  "p0SourceFixtureCount": 10,
+  "p0CoverageLimit": "ReLU gradient conventions and two-layer nonlinear training are covered only by P0 source/Python fixtures; the proposed tensor/autograd/ML v1 provider interfaces and independent JS oracle do not certify guest execution."
 }
