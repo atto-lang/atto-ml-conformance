@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "organization": "ores-truffle-oreslang",
+  "kind": "PROPOSED_PROVIDER_METADATA_NOT_GUEST_EXECUTION",
+  "providers": [
+    {
+      "repository": "oreslang-autograd",
+      "path": "contracts/providers/oreslang-autograd.v1.json",
+      "gitBlobSha": "ece72702c410a5d881dc5bfc1fb25ff91638df67"
+    },
+    {
+      "repository": "oreslang-ml",
+      "path": "contracts/providers/oreslang-ml.v1.json",
+      "gitBlobSha": "6c2e80f26897d034a18ed8305c1f54bfe551f249"
+    },
+    {
+      "repository": "oreslang-tensor",
+      "path": "contracts/providers/oreslang-tensor.v1.json",
+      "gitBlobSha": "45694b98242d057d993fa2d10d3300df02e07833"
+    }
+  ],
+  "requirements": [
+    "oreslang.autograd.scalar.v1",
+    "oreslang.ml.linear-sgd.v1",
+    "oreslang.tensor.cpu.v1"
+  ],
+  "guestEvidence": "NOT_EXECUTED",
+  "sourceExportsAllowed": false
+}
