@@ -49,6 +49,10 @@ def require(condition, message):
     if not condition:
         raise ValueError(message)
 
+def limit_child_output():
+    # POSIX runner: constrain actual file growth, not just post-exit reads.
+    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_OUTPUT, MAX_OUTPUT))
+
 def execute(repo: Path, script: str, compiler: Path, marker: str):
     env = os.environ.copy()
     env["ORESLANG_BIN"] = str(compiler)
