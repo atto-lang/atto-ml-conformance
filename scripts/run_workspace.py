@@ -154,12 +154,23 @@ def run(args):
         workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
     )
     cli_probe = probe_compiler_cli(compiler, repos["oreslang-tensor"])
-    jobs = [execute(repos[name],source,compiler,marker)
-            for name,source,marker in JOBS]
-    require(all(not git(repo, "status", "--porcelain") for repo in repos.values()),
-            "guest compiler modified one or more pinned repositories")
+    # An executable could modify itself or the workspace while responding to
+    # build-info/--check. Do not launch a guest job after observed drift.
     require(digest(compiler) == admitted_digest,
-            "compiler binary changed during the workspace probe")
+            "compiler changed during CLI preflight")
+    require(all(not git(repo, "status", "--porcelain") for repo in repos.values()),
+            "CLI preflight modified one or more pinned repositories")
+    jobs = []
+    for name, source, marker in JOBS:
+        require(digest(compiler) == admitted_digest,
+                "compiler changed before guest execution")
+        require(all(not git(repo, "status", "--porcelain") for repo in repos.values()),
+                "pinned source changed before guest execution")
+        jobs.append(execute(repos[name], source, compiler, marker))
+        require(digest(compiler) == admitted_digest,
+                "compiler changed during guest execution")
+        require(all(not git(repo, "status", "--porcelain") for repo in repos.values()),
+                "guest compiler modified one or more pinned repositories")
     return {"schema_version":"oreslang-ml-execution-probe/v1",
             "status":"EXECUTED_UNATTESTED",
             "compiler_sha256":admitted_digest,
