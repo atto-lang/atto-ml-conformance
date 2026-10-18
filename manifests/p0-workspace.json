@@ -3,8 +3,8 @@
   "source_state": "DRAFT_PR_HEADS_NOT_RELEASE_TAGS",
   "repositories": {
     "oreslang-tensor": "70d6b3d3c220e947f3c1c2b1c94fa43b903ad9b8",
-    "oreslang-autograd": "3da8f9b2bc9ee7edb9868f711d806ebbfdc4944b",
-    "oreslang-ml": "6baa2d71c986c91174ccf64fe19e9e54722c7847"
+    "oreslang-autograd": "906ba15c2e19865d61360295f18b70d0ddfa10a7",
+    "oreslang-ml": "26d0b112b20dc08694c66fd3ec3ce7cff2b7d557"
   },
   "compiler_artifact": "NOT_PINNED",
   "admission": "requires operator-supplied real compiler path and human-reviewed source/binary provenance"
