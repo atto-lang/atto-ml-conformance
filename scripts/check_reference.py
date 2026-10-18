@@ -10,6 +10,7 @@ import argparse
 import json
 import math
 from pathlib import Path
+from tensor_shape_oracle import broadcast_add, sum_to_shape
 
 MAX_BYTES = 131072
 MAX_ELEMENTS = 10000
