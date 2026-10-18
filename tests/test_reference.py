@@ -39,6 +39,26 @@ class ReferenceTests(unittest.TestCase):
             with self.assertRaises(FixtureError):
                 check(path)
 
+    def test_mlp_convergence_failure_rejected(self):
+        doc = json.loads(FIXTURE.read_text())
+        model = next(c for c in doc["cases"] if c["kind"] == "mlp_relu_train")
+        model["max_loss"] = 0.0
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "bad_mlp.json"
+            path.write_text(json.dumps(doc))
+            with self.assertRaises(FixtureError):
+                check(path)
+
+    def test_mlp_invalid_steps_rejected(self):
+        doc = json.loads(FIXTURE.read_text())
+        model = next(c for c in doc["cases"] if c["kind"] == "mlp_relu_train")
+        model["steps"] = -1
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "bad_steps.json"
+            path.write_text(json.dumps(doc))
+            with self.assertRaises(FixtureError):
+                check(path)
+
     def test_boolean_is_not_numeric(self):
         doc = json.loads(FIXTURE.read_text())
         doc["cases"][0]["left"]["values"][0] = True
