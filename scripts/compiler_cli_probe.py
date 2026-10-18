@@ -69,8 +69,20 @@ def probe_compiler_cli(compiler: Path, tensor_repo: Path) -> dict:
     code, output, errors = _run(compiler, ['--build-info'], tensor_repo)
     require(code == 0 and len(output) <= 4096,
             'missing bounded successful --build-info response')
+    def unique_fields(items):
+        result = {}
+        for key, value in items:
+            require(key not in result, 'duplicate --build-info JSON key')
+            result[key] = value
+        return result
+
+    def reject_nonfinite(value):
+        raise ValueError('ML_COMPILER_CLI_DENIED: invalid nonfinite JSON: ' + value)
+
     try:
-        info = json.loads(output.decode('utf-8', 'strict'))
+        info = json.loads(output.decode('utf-8', 'strict'),
+                          object_pairs_hook=unique_fields,
+                          parse_constant=reject_nonfinite)
     except (UnicodeError, json.JSONDecodeError):
         raise ValueError('ML_COMPILER_CLI_DENIED: malformed --build-info JSON') from None
     require(type(info) is dict and set(info) == {
