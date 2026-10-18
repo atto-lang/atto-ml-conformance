@@ -1,11 +1,11 @@
 {
   "schema_version": "oreslang-ml-workspace/v1",
-  "source_state": "DRAFT_RECONCILIATION_REFS_NOT_GUEST_TESTED",
+  "source_state": "DRAFT_STACKED_P0_PLUS_V1_CONTRACT_NOT_GUEST_TESTED",
   "repositories": {
-    "oreslang-tensor": "6b57b0b0cbf9339219746207e6f8f35766d141dd",
-    "oreslang-autograd": "fb13c56cd353179787bf5b71d890dc33d249d3f4",
-    "oreslang-ml": "ee37063bd2345b7570435720ce1f5b91795dac08"
+    "oreslang-tensor": "3ba3f98cb8b6cc65666e4d4a0369356d33ef7e13",
+    "oreslang-autograd": "57ff941b8362bcdaa2150054ba666fc1a6108362",
+    "oreslang-ml": "fb1a42aa72e3ad09cdf5f74b888c0b0cfe4d720e"
   },
   "compiler_artifact": "NOT_PINNED",
-  "admission": "Requires operator-supplied pinned executable real Oreslang compiler, independently verified compiler provenance, and exact clean same-org provider Git commits; never promote forged markers"
+  "admission": "Exact stacked P0 source+contract heads only; compiler_artifact NOT_PINNED and no actual guest evidence. Requires trusted source-org run with explicit verified compiler provenance."
 }
