@@ -10,6 +10,7 @@ import argparse
 from pathlib import Path
 import re
 import json
+import hashlib
 
 REPOSITORIES = ("oreslang-tensor", "oreslang-autograd", "oreslang-ml")
 ALLOWED_CROSS_EDGES = frozenset({
@@ -48,11 +49,12 @@ def regular_inside_workspace(path: Path, root: Path):
     require(path.is_file() and path.suffix == ".ores", "missing Oreslang import target")
 
 
-def validate_workspace_imports(workspace: Path):
+def validate_workspace_imports(workspace: Path, source_lock: Path | None = None):
     workspace = Path(workspace).absolute()
     require(workspace.is_dir() and not workspace.is_symlink(), "invalid workspace")
     sources = {}
     owners = {}
+    blobs = {}
     for repo in REPOSITORIES:
         home = workspace / repo
         require(home.is_dir() and not home.is_symlink(), "missing or symlinked repository " + repo)
@@ -69,6 +71,9 @@ def validate_workspace_imports(workspace: Path):
             require(not code.startswith("\ufeff"), "source BOM")
             sources[path] = code
             owners[path] = repo
+            blobs[str(path.relative_to(workspace))] = hashlib.sha1(
+                b"blob " + str(len(data)).encode() + b"\0" + data
+            ).hexdigest()
     edges = set()
     imports = 0
     for path, code in sources.items():
@@ -115,9 +120,43 @@ def validate_workspace_imports(workspace: Path):
                 seen.add(signature)
             imports += len(symbols)
     require(edges == EXPECTED_CROSS_EDGES, "ML tensor/autograd import closure incomplete")
+    if source_lock is not None:
+        lock_path = Path(source_lock)
+        require(lock_path.is_file() and not lock_path.is_symlink(), "invalid source lock")
+        raw = lock_path.read_bytes()
+        require(0 < len(raw) <= 16_384, "invalid lock size")
+        def no_duplicate_keys(pairs):
+            obj = {}
+            for k, v in pairs:
+                require(k not in obj, "duplicate source lock JSON key")
+                obj[k] = v
+            return obj
+        try:
+            lock = json.loads(raw.decode("utf-8", "strict"), object_pairs_hook=no_duplicate_keys)
+        except (UnicodeError, json.JSONDecodeError):
+            raise ValueError("ML_IMPORT_CLOSURE_DENIED: invalid source lock JSON") from None
+        require(isinstance(lock, dict) and set(lock) == {
+            "schemaVersion", "kind", "organization", "expectedSourceFiles",
+            "expectedImports", "requiredCrossRepositoryEdges", "sourceBlobs",
+            "sourceExportAuthorized", "guestExecution", "releaseReady"
+        }, "invalid lock schema")
+        require(lock["schemaVersion"] == 1 and type(lock["schemaVersion"]) is int and
+                lock["kind"] == "PINNED_SOURCE_BLOBS_NOT_GUEST" and
+                lock["organization"] == "ores-truffle-oreslang" and
+                lock["sourceExportAuthorized"] is False and lock["guestExecution"] is False and
+                lock["releaseReady"] is False, "source lock cannot promote execution")
+        require(type(lock["expectedSourceFiles"]) is int and
+                lock["expectedSourceFiles"] == len(blobs) and
+                type(lock["expectedImports"]) is int and
+                lock["expectedImports"] == imports, "source/import count drift")
+        require(lock["requiredCrossRepositoryEdges"] == [list(x) for x in sorted(edges)],
+                "source lock import edge drift")
+        require(type(lock["sourceBlobs"]) is dict and lock["sourceBlobs"] == blobs,
+                "source Git blobs changed or added")
     return {"status": "STATIC_IMPORT_CLOSURE_NOT_COMPILED", "source_files": len(sources),
             "imports_verified": imports, "cross_repository_edges":
                 [list(x) for x in sorted(edges)],
+            "source_blob_lock_validated": source_lock is not None,
             "private_source_transferred": False, "compiler_executed": False,
             "guest_executed": False, "release_ready": False}
 
@@ -125,8 +164,10 @@ def validate_workspace_imports(workspace: Path):
 def main():
     args = argparse.ArgumentParser()
     args.add_argument("--workspace", required=True)
+    args.add_argument("--source-lock")
     options = args.parse_args()
-    print(json.dumps(validate_workspace_imports(Path(options.workspace)), indent=2, sort_keys=True))
+    print(json.dumps(validate_workspace_imports(Path(options.workspace),
+                                                         Path(options.source_lock) if options.source_lock else None), indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":
