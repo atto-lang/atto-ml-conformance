@@ -20,6 +20,8 @@ import resource
 import sys
 import tempfile
 from check_workspace_imports import validate_workspace_imports
+from compiler_cli_probe import probe_compiler_cli
+from verify_pinned_checkouts import verify_pinned_checkouts
 
 MAX_OUTPUT = 65536
 TIMEOUT = 120
@@ -180,9 +182,23 @@ def run(args):
     import_closure = validate_workspace_imports(
         workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
     )
+    # Require genuine CLI behavior before attempting any guest execution.
+    cli_probe = probe_compiler_cli(compiler, repos["oreslang-tensor"])
+    require(digest(compiler) == admitted_digest,
+            "compiler binary changed during CLI preflight")
+    verify_pinned_checkouts(repos, shas, trees)
+    require(validate_workspace_imports(
+        workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
+    ) == import_closure, "source import lock changed during CLI preflight")
     jobs = []
     for name, source, marker in JOBS:
         repo = repos[name]
+        # Reject clean HEAD swaps, Git-index masking and changed imported units
+        # BEFORE (not only after) each use of the admitted compiler.
+        verify_pinned_checkouts(repos, shas, trees)
+        require(validate_workspace_imports(
+            workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
+        ) == import_closure, "source lock changed before guest execution")
         source_blob = verify_guest_source(repo, source)
         require(digest(compiler) == admitted_digest,
                 "compiler binary changed before guest execution")
@@ -191,6 +207,10 @@ def run(args):
                 "guest source changed during execution")
         require(digest(compiler) == admitted_digest,
                 "compiler binary changed during guest execution")
+        verify_pinned_checkouts(repos, shas, trees)
+        require(validate_workspace_imports(
+            workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
+        ) == import_closure, "source lock changed during guest execution")
         receipt["source_git_blob"] = source_blob
         jobs.append(receipt)
     # Compiler execution could mutate imported Oreslang dependencies, including
@@ -208,6 +228,7 @@ def run(args):
             "source_commits":shas,
             "source_trees":trees,
             "static_import_closure":import_closure,
+            "compiler_cli_admission":cli_probe,
             "checks":jobs,
             "source_binary_provenance_attested":False,
             "automated_backend_parity_attested":False,

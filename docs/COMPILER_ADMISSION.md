@@ -41,3 +41,50 @@ The compiler is invoked with a minimal explicit environment (`PATH` fixed to the
 **Locally reproduced security tests:** 14/14 source Git-identity negatives and 10/10 direct-dispatch/env negatives passed using disposable synthetic Git histories and mock executables. These reproduce the focused admission logic, **not** a full exact-head repository checkout or Oreslang guest execution. The complete PR still requires an authorized runner with stepful checks and a reviewed, pinned real Java compiler.
 
 **Alternate organization probe:** a no-checkout, source-free capacity workflow was staged on private `fiducia-cloud/fiducia-e2e` PR #87 (now closed unmerged). Its workflow failed before any step executed, so this probe does not establish available runner capacity. It contains no Oreslang source and does not authorize cross-org transfer. Incidents #22 and #77 remain open.
+
+
+## Reconciled CLI admission and immutable guest pipeline (2026-10-18)
+
+The stacked candidate preserves the upstream P0 source admission, exact `HEAD:<path>` guest Git blob verification, no-secret compiler environment, Git-injection defenses and post-execution import closure. It additionally requires strict `--build-info`, pinned positive `--check`, source-specific malformed negative `--check`, and repeated **commit/tree/blob/import-lock/cleanliness/compiler SHA-256** checks around each guest program. Neither source-free CI nor these preflights attest a real compiler artifact.
+
+## Mandatory Java CLI protocol preflight (stacked integration)
+
+The opt-in runner now calls `scripts/compiler_cli_probe.py` **after** immutable source checkout and import-closure admission, but **before** the six guest smoke programs.
+
+- `--build-info` must return strict JSON with `build_mode`, `default_execution_mode`, and `guest_execution`, matching the Java `NativeBuildMode` contract for JVM, AOT or hybrid.
+- `--check tests/smoke.ores` must succeed on the pinned Tensor source without stdout.
+- `--check` on deliberately malformed synthetic `.ores` source must fail nonzero with a diagnostic and no stdout. The negative fixture is generated outside the pinned repositories.
+- Compiler subprocesses use bounded output, 30-second deadlines and process-group cleanup; post-execution checks require clean source repositories and the original compiler SHA-256.
+
+The response includes `compiler_cli_admission` with status `CLI_BEHAVIOR_PROBED_UNATTESTED`. The fifteen local shell-double tests cover denial paths and JVM/AOT/hybrid mode acceptance, **not** real Oreslang compilation or guest execution. A forged executable could still imitate the expected protocol.
+
+The Java Maven project uses Java 21 and `dev.oreslang.launcher.OresMain` as the main class. A Maven JAR is not automatically a self-contained executable; its dependencies/module classpath must be supplied or a native image built. No exact-revision compiler artifact, independent source-to-binary attestation, or successful Oreslang ML guest run has been verified. The open private-source incidents prohibit alternate-org source mirroring without the required independent authorization.
+
+### Hardening audit: syntax diagnostics and inter-job integrity
+
+A generic nonzero exit is insufficient to prove a negative compile: it might be a usage error (`2`), missing dependency, crash, or unrelated stderr. The negative syntax preflight now requires exactly exit status `1`, no stdout, and a Java `OresMain`-compatible, **absolute negative fixture path plus positive line/column and `error:`** on stderr. `--build-info` also must not emit stderr. Generic errors and stdout contamination are explicitly denied. These are behavioral admissions, not compiler identity/provenance attestation.
+
+A successful CLI probe does not permit unchecked subsequent execution. The workspace runner immediately re-verifies compiler SHA-256 and source cleanliness, and repeats both checks before and after **each** of the six guest smoke programs. The residual path-execution time-of-check/time-of-use gap and forged executable behavior remain unproven trust assumptions; approved toolchain custody and a separate attested execution environment are required for release evidence.
+
+An independent synthetic oracle is staged at [Sagitta PR #30](https://github.com/sagitta-stack/sagitta-infra/pull/30). It contains no private source, secrets, checkout, or real compiler; its GitHub Actions receipt cannot qualify as exact-source CI or fulfill the pending protected-main security approval. The canonical cross-org publisher remains disabled while incident reviews [#22](https://github.com/ores-truffle-oreslang/oreslang-platform-conformance/issues/22) and [#77](https://github.com/ores-truffle-oreslang/oreslang-platform-conformance/issues/77) remain open.
+
+### Exact commit/tree revalidation
+
+Git cleanliness alone is insufficient: a compiler could use `git checkout`/`git reset` to move a provider repository to a *different clean revision* between admission and execution. `scripts/verify_pinned_checkouts.py` therefore checks all three immutable commit SHAs, Git tree SHAs and tracked/untracked cleanliness at each preflight/guest boundary. It strips caller-provided `GIT_*` environment overrides before querying Git so a poisoned `GIT_DIR`, `GIT_WORK_TREE` or `GIT_INDEX_FILE` cannot silently redirect the verifier. Seven dedicated local Git tests cover a clean HEAD change, tree mismatch, dirty/untracked files, missing provider identity, poisoned Git environment and the positive pinned case. The cumulative isolated host-only suite is **22/22**; not Oreslang guest execution.
+
+
+**Integration evidence boundary:** the component-local synthetic tests were previously evaluated separately; the combined tree must pass its full suite at this exact merge head. The source-organization runner remains unable to produce a stepful proof, and cross-org source mirroring is denied while incidents #22 and #77 remain unresolved. Source-free Sagitta PR #30 may test runner capacity only.
+
+### Index-masking / fsmonitor hardening (2026-10-18)
+
+The earlier verifier checked exact commit/tree and Git porcelain status, but `skip-worktree` and `assume-unchanged` can hide modifications to other tracked source files from porcelain. The verifier now rejects any nonstandard `git ls-files -v -z` tracked-file flags, including those two index bits, **before every guest run**. It also overrides repository-local `core.fsmonitor` and `core.untrackedCache` while querying Git so a configured filesystem-monitor hook cannot execute or influence results. The verifier continues to require the real Git root, pinned commit SHA, pinned tree SHA and clean workspace; special/sparse-checkout index states intentionally fail closed.
+
+Four additional synthetic local Git regressions exercise changed `skip-worktree`, changed `assume-unchanged`, a nonmodified masked index entry and a configured fsmonitor hook. **27/27 focused local tests pass** (16 CLI protocol + 11 checkout identity), using source files whose Git blob hashes match PR #7. This is host-side admission evidence, not an actual Java compiler build or Oreslang guest run. A separate, independently written **source-free** synthetic Git-index model is tested in [Sagitta PR #30](https://github.com/sagitta-stack/sagitta-infra/pull/30); no ML/Oreslang private tree is copied to that carrier. Source-org hosted execution and source-export security gates remain unresolved.
+
+### Exact Java compiler bundle producer (source-org draft PR #1373)
+
+The JVM bundle producer is staged in [oreslang-source.java #1373](https://github.com/ores-truffle-oreslang/oreslang-source.java/pull/1373). It is restricted to an exact-SHA checkout and build **within the original private Oreslang source organization**, uses the existing GraalVM 25.3 / Java 25 Maven workflow, copies the runtime JAR closure, and records source commit/tree, Maven POM, launcher and dependency SHA-256 identities. It rejects missing/altered JARs and invalid JVM/JIT build-info capabilities; the job also requires positive/negative genuine `OresMain --check` behavior before storing a one-day source-org-only artifact.
+
+**No compiler bundle has yet been executed or independently attested.** In the producer, `provenance_independently_attested=false` and `oreslang_ml_guest_executed=false` are mandatory. A self-reported manifest (including its toolchain fields and individual hashes) is not an independently trusted source-to-binary provenance certificate. The ML runner must not promote PR #1373's eventual build receipt directly to real ML guest evidence: it still needs the full dependency bundle attested from independent trust anchors, an exact SHA-256 for its admitted executable and all six pinned programs executed.
+
+The private-source incident gates [#22](https://github.com/ores-truffle-oreslang/oreslang-platform-conformance/issues/22) and [#77](https://github.com/ores-truffle-oreslang/oreslang-platform-conformance/issues/77) still prohibit copying private source/binaries into another organization without reviewed authorization. Keep both draft PRs unmerged.
