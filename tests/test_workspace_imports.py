@@ -24,13 +24,14 @@ class WorkspaceImportTests(unittest.TestCase):
                                  "import fnc checked_numel from '../../oreslang-tensor/src/tensor';\n"
                                  "define pub class TapeF64 as\nend\n")
         self.ml.write_text("import class TapeF64 from '../../oreslang-autograd/src/tape';\n"
+                           "import class TensorF64 from '../../oreslang-tensor/src/tensor';\n"
                            'import module Assert from "std/assert";\n')
 
     def test_positive_exact_three_repo_graph(self):
         r = validate_workspace_imports(self.root)
         self.assertEqual(r["source_files"], 3)
-        self.assertEqual(r["imports_verified"], 4)
-        self.assertEqual(len(r["cross_repository_edges"]), 2)
+        self.assertEqual(r["imports_verified"], 5)
+        self.assertEqual(len(r["cross_repository_edges"]), 3)
         self.assertFalse(r["guest_executed"])
 
     def test_missing_provider(self):
@@ -94,9 +95,10 @@ class WorkspaceImportTests(unittest.TestCase):
         lock = {
             "schemaVersion": 1, "kind": "PINNED_SOURCE_BLOBS_NOT_GUEST",
             "organization": "ores-truffle-oreslang", "expectedSourceFiles": 3,
-            "expectedImports": 4,
+            "expectedImports": 5,
             "requiredCrossRepositoryEdges": [["oreslang-autograd", "oreslang-tensor"],
-                                              ["oreslang-ml", "oreslang-autograd"]],
+                                              ["oreslang-ml", "oreslang-autograd"],
+                                              ["oreslang-ml", "oreslang-tensor"]],
             "sourceBlobs": blobs, "sourceExportAuthorized": False,
             "guestExecution": False, "releaseReady": False
         }

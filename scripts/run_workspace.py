@@ -27,11 +27,15 @@ MAX_OUTPUT = 65536
 TIMEOUT = 120
 JOBS = [
     ("oreslang-tensor", "tests/smoke.ores", "ORES_ML_TENSOR_SMOKE_PASS"),
+    ("oreslang-tensor", "tests/row_batches_smoke.ores", "ORES_TENSOR_ROW_BATCH_VJP_PASS"),
+    ("oreslang-tensor", "tests/matmul_vjp_smoke.ores", "ORES_TENSOR_MATMUL_DUAL_VJP_PASS"),
     ("oreslang-autograd", "tests/smoke.ores", "ORES_ML_AUTOGRAD_SMOKE_PASS"),
     ("oreslang-autograd", "tests/tensor_vjp_smoke.ores", "ORES_ML_TENSOR_VJP_SMOKE_PASS"),
+    ("oreslang-autograd", "tests/row_gather_vjp_smoke.ores", "ORES_AUTOGRAD_ROW_GATHER_VJP_PASS"),
     ("oreslang-ml", "tests/smoke.ores", "ORES_ML_TRAINING_SMOKE_PASS"),
     ("oreslang-ml", "examples/train_with_autograd.ores", "ORES_ML_AUTOGRAD_TRAINING_PASS"),
     ("oreslang-ml", "examples/train_two_layer_autograd.ores", "ORES_ML_TWO_LAYER_RELU_AUTOGRAD_PASS"),
+    ("oreslang-ml", "examples/train_aligned_dataset.ores", "ORES_ML_ALIGNED_DATASET_TRAINING_PASS"),
 ]
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")

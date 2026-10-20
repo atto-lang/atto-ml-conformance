@@ -16,6 +16,7 @@ REPOSITORIES = ("oreslang-tensor", "oreslang-autograd", "oreslang-ml")
 ALLOWED_CROSS_EDGES = frozenset({
     ("oreslang-autograd", "oreslang-tensor"),
     ("oreslang-ml", "oreslang-autograd"),
+    ("oreslang-ml", "oreslang-tensor"),
 })
 EXPECTED_CROSS_EDGES = ALLOWED_CROSS_EDGES
 MAX_FILE_BYTES = 1_000_000

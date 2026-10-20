@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "kind": "PINNED_SOURCE_BLOBS_NOT_GUEST",
   "organization": "ores-truffle-oreslang",
-  "expectedSourceFiles": 14,
-  "expectedImports": 52,
+  "expectedSourceFiles": 22,
+  "expectedImports": 83,
   "requiredCrossRepositoryEdges": [
     [
       "oreslang-autograd",
@@ -12,22 +12,34 @@
     [
       "oreslang-ml",
       "oreslang-autograd"
+    ],
+    [
+      "oreslang-ml",
+      "oreslang-tensor"
     ]
   ],
   "sourceBlobs": {
     "oreslang-autograd/src/backward_checked.ores": "ea85a8544b89d7047f434a98ff744fd530a83107",
     "oreslang-autograd/src/forward_checked.ores": "a14a6410c024581b9e002f858a46fc94cbaeca85",
+    "oreslang-autograd/src/row_gather_vjp.ores": "7a92ab3b4f09832129fa738f68e07fb566064d65",
     "oreslang-autograd/src/tape.ores": "caf8f2a616eb75a0365efa9fb88b4d01cd12b73f",
     "oreslang-autograd/src/tensor_vjp.ores": "432fbe12a1b0b3815a640aeaa4f55cdd31dfcd66",
+    "oreslang-autograd/tests/row_gather_vjp_smoke.ores": "1728782e20813ea435f711f32e87f32a8116d4ea",
     "oreslang-autograd/tests/smoke.ores": "c0b2b0b3bb7e177968746852c9006fefd03251b9",
     "oreslang-autograd/tests/tensor_vjp_smoke.ores": "7c9f5607d08b4b61aecc15714db43f0145e49437",
+    "oreslang-ml/examples/train_aligned_dataset.ores": "d2f24d80e041f5741cfb162e41ea0faac556df90",
     "oreslang-ml/examples/train_two_layer_autograd.ores": "c5ff6f61339136abb3c9c537ef90e6a22d6c2ff7",
     "oreslang-ml/examples/train_with_autograd.ores": "fa1081602894c2a4508526b8fc35373100ed9a99",
+    "oreslang-ml/src/dataset_batches.ores": "b679c03135972d348f290ff0303440c2cd636773",
     "oreslang-ml/src/linear.ores": "ae594139719538cc97e5044cd57a28f0e0eb745f",
     "oreslang-ml/tests/smoke.ores": "4d576deb2eec3e0fdb5165eadf8d22ca683faad6",
     "oreslang-tensor/src/broadcast.ores": "3bb44bbc71573bf9e3944b024f319d9a5d0c2729",
     "oreslang-tensor/src/gradients.ores": "8aa4b67c3f843022892bcad63338646bf19b63dc",
+    "oreslang-tensor/src/matmul_vjp.ores": "0fb9488062923660c163e44f9a45f69db9dacdef",
+    "oreslang-tensor/src/row_batches.ores": "36a2f5cc4fca565c8927160cfac7af9561004190",
     "oreslang-tensor/src/tensor.ores": "3bf09bf6b98964d15ca145a6c97b74f307bc47b4",
+    "oreslang-tensor/tests/matmul_vjp_smoke.ores": "5aced20ccd0bf8dfd38beb35b13c94decc7fd714",
+    "oreslang-tensor/tests/row_batches_smoke.ores": "88c93f5d63d0b394717b9cb95cfd0da6c0154e10",
     "oreslang-tensor/tests/smoke.ores": "a7e37cb13155fda86aca0e465180af24046e0190"
   },
   "sourceExportAuthorized": false,

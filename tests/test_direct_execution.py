@@ -25,9 +25,9 @@ class DirectGuestDispatchTests(unittest.TestCase):
         self.compiler.write_text("#!/bin/sh\n" + body + "\n")
         self.compiler.chmod(0o700)
 
-    def test_six_guest_programs_are_dispatched_separately(self):
-        self.assertEqual(len(JOBS), 6)
-        self.assertEqual(len(set((name, source) for name, source, _ in JOBS)), 6)
+    def test_ten_guest_programs_are_dispatched_separately(self):
+        self.assertEqual(len(JOBS), 10)
+        self.assertEqual(len(set((name, source) for name, source, _ in JOBS)), 10)
         self.assertTrue(all(source.endswith(".ores") for _, source, _ in JOBS))
         self.assertTrue(all("|" not in marker for _, _, marker in JOBS))
 
