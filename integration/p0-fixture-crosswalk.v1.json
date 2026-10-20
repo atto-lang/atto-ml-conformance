@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "kind": "HOST_ORACLE_FIXTURE_CROSSWALK_NOT_GUEST_EXECUTION",
+  "p0FixturePath": "fixtures/p0-v1.json",
+  "providerLockPath": "contracts/provider-lock.v1.json",
+  "mapping": [
+    {
+      "interfaceId": "oreslang.autograd.scalar.v1",
+      "contractFixtureId": "autograd/scalar-tape/v1",
+      "p0CaseId": "autograd/diamond",
+      "coverage": "P0_SCALAR_REFERENCE_ONLY"
+    },
+    {
+      "interfaceId": "oreslang.ml.linear-sgd.v1",
+      "contractFixtureId": "ml/linear-sgd/v1",
+      "p0CaseId": "ml/affine-500",
+      "coverage": "P0_SCALAR_REFERENCE_ONLY"
+    },
+    {
+      "interfaceId": "oreslang.tensor.cpu.v1",
+      "contractFixtureId": "tensor/add/v1",
+      "p0CaseId": "tensor/add-2x2",
+      "coverage": "P0_SCALAR_REFERENCE_ONLY"
+    },
+    {
+      "interfaceId": "oreslang.tensor.cpu.v1",
+      "contractFixtureId": "tensor/matmul/v1",
+      "p0CaseId": "tensor/matmul-2x2",
+      "coverage": "P0_SCALAR_REFERENCE_ONLY"
+    },
+    {
+      "interfaceId": "oreslang.tensor.cpu.v1",
+      "contractFixtureId": "tensor/shape/v1",
+      "p0CaseId": null,
+      "coverage": "NOT_EXPLICIT_P0_CASE"
+    }
+  ],
+  "p0OnlyCases": [
+    "autograd/relu-active",
+    "autograd/relu-inactive",
+    "autograd/relu-zero",
+    "ml/two-layer-relu-500",
+    "tensor/relu-4",
+    "tensor/sum-2x2"
+  ],
+  "guestExecuted": false,
+  "p0SourceFixtureCount": 10,
+  "p0CoverageLimit": "ReLU gradient conventions and two-layer nonlinear training are covered only by P0 source/Python fixtures; the proposed tensor/autograd/ML v1 provider interfaces and independent JS oracle do not certify guest execution."
+}

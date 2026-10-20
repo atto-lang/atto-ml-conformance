@@ -19,17 +19,22 @@ import subprocess
 import resource
 import sys
 import tempfile
+from check_workspace_imports import validate_workspace_imports
+from compiler_cli_probe import probe_compiler_cli
+from verify_pinned_checkouts import verify_pinned_checkouts
 
 MAX_OUTPUT = 65536
 TIMEOUT = 120
 JOBS = [
-    ("oreslang-tensor", "scripts/test.sh", "ORES_ML_TENSOR_SMOKE_PASS"),
-    ("oreslang-autograd", "scripts/test.sh", "ORES_ML_AUTOGRAD_SMOKE_PASS"),
-    ("oreslang-autograd", "scripts/test-workspace.sh", "ORES_ML_TENSOR_VJP_SMOKE_PASS"),
-    ("oreslang-ml", "scripts/test.sh", "ORES_ML_TRAINING_SMOKE_PASS"),
-    ("oreslang-ml", "scripts/test-workspace.sh", "ORES_ML_AUTOGRAD_TRAINING_PASS|ORES_ML_TWO_LAYER_RELU_AUTOGRAD_PASS"),
+    ("oreslang-tensor", "tests/smoke.ores", "ORES_ML_TENSOR_SMOKE_PASS"),
+    ("oreslang-autograd", "tests/smoke.ores", "ORES_ML_AUTOGRAD_SMOKE_PASS"),
+    ("oreslang-autograd", "tests/tensor_vjp_smoke.ores", "ORES_ML_TENSOR_VJP_SMOKE_PASS"),
+    ("oreslang-ml", "tests/smoke.ores", "ORES_ML_TRAINING_SMOKE_PASS"),
+    ("oreslang-ml", "examples/train_with_autograd.ores", "ORES_ML_AUTOGRAD_TRAINING_PASS"),
+    ("oreslang-ml", "examples/train_two_layer_autograd.ores", "ORES_ML_TWO_LAYER_RELU_AUTOGRAD_PASS"),
 ]
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 def digest(path: Path) -> str:
     h = hashlib.sha256()
@@ -43,7 +48,9 @@ def digest(path: Path) -> str:
 
 def git(repo: Path, *args: str) -> str:
     cp = subprocess.run(["git", "-C", str(repo), *args],
-                        capture_output=True, text=True, timeout=10, check=True)
+                        capture_output=True, text=True, timeout=10, check=True,
+                        env={"PATH": os.defpath, "LC_ALL": "C", "GIT_CONFIG_NOSYSTEM": "1",
+                             "GIT_CONFIG_GLOBAL": os.devnull, "GIT_NO_REPLACE_OBJECTS": "1"})
     return cp.stdout.strip()
 
 def require(condition, message):
@@ -54,11 +61,21 @@ def limit_child_output():
     # POSIX runner: constrain actual file growth, not just post-exit reads.
     resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_OUTPUT, MAX_OUTPUT))
 
-def execute(repo: Path, script: str, compiler: Path, marker: str):
-    env = os.environ.copy()
-    env["ORESLANG_BIN"] = str(compiler)
+def execute(repo: Path, source: str, compiler: Path, marker: str):
+    """Invoke the admitted compiler directly; source scripts are not proof."""
+    require(isinstance(source, str) and source.endswith(".ores"),
+            "guest source must be a .ores file")
+    candidate = repo / source
+    require(not candidate.is_symlink(), "guest source must not be a symlink")
+    resolved = candidate.resolve(strict=True)
+    require(resolved.is_file() and repo.resolve() in resolved.parents,
+            "guest source escapes the pinned repository")
+    # Explicit allowlist: do not pass CI credentials, injected Java/Python opts,
+    # LD_PRELOAD, or provider-controlled PATH to a guest process.
+    # This is environment hygiene, NOT a filesystem/process sandbox.
+    env = {"PATH": os.defpath, "LANG": "C", "LC_ALL": "C", "TZ": "UTC"}
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
-        proc = subprocess.Popen(["sh", script], cwd=repo, env=env,
+        proc = subprocess.Popen([str(compiler), source], cwd=repo, env=env,
                                 stdin=subprocess.DEVNULL, stdout=out, stderr=err,
                                 start_new_session=(os.name == "posix"), preexec_fn=limit_child_output)
         timed_out = False
@@ -79,22 +96,59 @@ def execute(repo: Path, script: str, compiler: Path, marker: str):
         stdout = out.read().decode("utf-8",errors="replace")
         stderr = err.read().decode("utf-8",errors="replace")
     require(not timed_out, "guest execution timed out")
-    require(proc.returncode == 0, f"{repo.name} {script}: guest exit {proc.returncode}: {stderr[-1000:]}")
+    require(proc.returncode == 0, f"{repo.name} {source}: guest exit {proc.returncode}: {stderr[-1000:]}")
     observed = stdout.splitlines()
-    required = marker.split("|")
-    require(all(m in observed for m in required),
-            f"{repo.name} {script}: missing required guest success markers")
-    return {"repo":repo.name,"script":script,"exit":proc.returncode,
+    require(observed == [marker],
+            f"{repo.name} {source}: unexpected guest stdout or missing exact success marker")
+    return {"repo":repo.name,"source":source,"exit":proc.returncode,
             "stdout_sha256":hashlib.sha256(stdout.encode()).hexdigest(),
             "stderr_sha256":hashlib.sha256(stderr.encode()).hexdigest(),
             "stdout_bytes":out_size,"stderr_bytes":err_size,
             "exact_marker_present":True}
 
+def verify_guest_source(repo: Path, source: str) -> str:
+    """Bind executable fixture bytes to HEAD, including skip-worktree changes."""
+    require(isinstance(source, str) and source.endswith(".ores") and
+            "\\" not in source and "//" not in source,
+            "invalid guest source path")
+    relative = Path(source)
+    require(not relative.is_absolute() and relative.parts and
+            source == relative.as_posix() and
+            all(part not in ("", ".", "..") for part in relative.parts),
+            "guest source must be a normal repository-relative path")
+    require(Path(git(repo, "rev-parse", "--show-toplevel")).resolve() == repo.resolve(),
+            "guest source repository Git root mismatch")
+    target = repo
+    for part in relative.parts:
+        target = target / part
+        require(not target.is_symlink(), "symlink in guest source path")
+    require(target.is_file(), "missing guest source file")
+    expected = git(repo, "rev-parse", "--verify", "HEAD:" + source)
+    require(bool(SHA40.fullmatch(expected)), "guest source missing from pinned Git HEAD")
+    actual = git(repo, "hash-object", "--no-filters", "--", source)
+    require(actual == expected, "guest source differs from pinned Git blob")
+    return actual
+
+def admit_compiler(compiler_path: str, expected_sha256: str, workspace: Path) -> tuple[Path, str]:
+    """Hash-bind executable bytes before probe; provenance remains unverified."""
+    require(isinstance(expected_sha256, str) and SHA256.fullmatch(expected_sha256),
+            "explicit --compiler-sha256 is required (64 lowercase hex)")
+    supplied = Path(compiler_path)
+    require(supplied.is_absolute() and not supplied.is_symlink(),
+            "compiler must be an absolute non-symlink executable")
+    compiler = supplied.resolve(strict=True)
+    require(compiler.is_file() and os.access(compiler, os.X_OK),
+            "compiler must be an absolute executable file")
+    require(compiler != workspace and workspace not in compiler.parents,
+            "compiler executable must be outside mutable source workspace")
+    actual = digest(compiler)
+    require(actual == expected_sha256, "compiler binary SHA-256 mismatch")
+    return compiler, actual
+
 def run(args):
     workspace = Path(args.workspace).resolve(strict=True)
-    compiler = Path(args.compiler).resolve(strict=True)
-    require(compiler.is_file() and os.access(compiler,os.X_OK),
-            "compiler must be an absolute executable file")
+    compiler, admitted_digest = admit_compiler(
+        args.compiler, getattr(args, "compiler_sha256", None), workspace)
     doc = json.loads(Path(args.manifest).read_text())
     require(doc.get("schema_version") == "oreslang-ml-workspace/v1",
             "unknown manifest version")
@@ -110,8 +164,11 @@ def run(args):
     for name, sha in shas.items():
         require(isinstance(sha,str) and SHA40.fullmatch(sha),
                 "invalid git commit identity")
-        repo = (workspace / name).resolve(strict=True)
-        require(repo.parent == workspace, "repository path escapes sibling workspace")
+        repo_path = workspace / name
+        require(not repo_path.is_symlink(), "repository symlink forbidden")
+        repo = repo_path.resolve(strict=True)
+        require(repo == repo_path and repo.parent == workspace,
+                "repository path escapes sibling workspace")
         require(repo.is_dir(), "missing repository directory")
         actual = git(repo,"rev-parse","HEAD")
         require(actual == sha, f"{name}: pinned source commit mismatch")
@@ -120,13 +177,58 @@ def run(args):
         require(not git(repo,"status","--porcelain"),
                 f"{name}: dirty or untracked working tree")
         repos[name] = repo
-    jobs = [execute(repos[name],script,compiler,marker)
-            for name,script,marker in JOBS]
+    # Resolve cross-repo source imports and public symbols only after all three
+    # checked-out commits, trees and cleanliness have been verified.
+    import_closure = validate_workspace_imports(
+        workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
+    )
+    # Require genuine CLI behavior before attempting any guest execution.
+    cli_probe = probe_compiler_cli(compiler, repos["oreslang-tensor"])
+    require(digest(compiler) == admitted_digest,
+            "compiler binary changed during CLI preflight")
+    verify_pinned_checkouts(repos, shas, trees)
+    require(validate_workspace_imports(
+        workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
+    ) == import_closure, "source import lock changed during CLI preflight")
+    jobs = []
+    for name, source, marker in JOBS:
+        repo = repos[name]
+        # Reject clean HEAD swaps, Git-index masking and changed imported units
+        # BEFORE (not only after) each use of the admitted compiler.
+        verify_pinned_checkouts(repos, shas, trees)
+        require(validate_workspace_imports(
+            workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
+        ) == import_closure, "source lock changed before guest execution")
+        source_blob = verify_guest_source(repo, source)
+        require(digest(compiler) == admitted_digest,
+                "compiler binary changed before guest execution")
+        receipt = execute(repo, source, compiler, marker)
+        require(verify_guest_source(repo, source) == source_blob,
+                "guest source changed during execution")
+        require(digest(compiler) == admitted_digest,
+                "compiler binary changed during guest execution")
+        verify_pinned_checkouts(repos, shas, trees)
+        require(validate_workspace_imports(
+            workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
+        ) == import_closure, "source lock changed during guest execution")
+        receipt["source_git_blob"] = source_blob
+        jobs.append(receipt)
+    # Compiler execution could mutate imported Oreslang dependencies, including
+    # files whose Git status is hidden by skip-worktree. Re-evaluate locked bytes.
+    after_closure = validate_workspace_imports(
+        workspace, Path(__file__).resolve().parents[1] / "integration/ml-source-blob-lock.v1.json"
+    )
+    require(after_closure == import_closure, "ML source import closure changed during guest execution")
+    for name, repo in repos.items():
+        require(not git(repo, "status", "--porcelain", "--untracked-files=all"),
+                f"{name}: workspace mutated during guest execution")
     return {"schema_version":"oreslang-ml-execution-probe/v1",
             "status":"EXECUTED_UNATTESTED",
-            "compiler_sha256":digest(compiler),
+            "compiler_sha256":admitted_digest,
             "source_commits":shas,
             "source_trees":trees,
+            "static_import_closure":import_closure,
+            "compiler_cli_admission":cli_probe,
             "checks":jobs,
             "source_binary_provenance_attested":False,
             "automated_backend_parity_attested":False,
@@ -136,6 +238,8 @@ if __name__=="__main__":
     p=argparse.ArgumentParser()
     p.add_argument("--workspace",required=True)
     p.add_argument("--compiler",required=True)
+    p.add_argument("--compiler-sha256",required=True,
+                   help="Exact SHA-256 of independently reviewed compiler executable")
     p.add_argument("--manifest",default="manifests/p0-workspace.json")
     args=p.parse_args()
     try:

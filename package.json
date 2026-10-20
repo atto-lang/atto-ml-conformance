@@ -1,0 +1,14 @@
+{
+  "name": "@oreslang/ml-conformance",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test:oracle": "node --test reference/test/*.test.mjs",
+    "test": "node --test reference/test/*.test.mjs test/*.test.mjs",
+    "test:contracts": "node --test test/*.test.mjs",
+    "audit:workspace-metadata": "node bin/audit-workspace-metadata.mjs"
+  }
+}
