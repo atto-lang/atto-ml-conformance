@@ -16,6 +16,12 @@ jobs:
           node-version: '22'
       - name: Run independent reference fixtures and pinned contract checks
         run: npm test
+      - name: Run Rust evidence-classification reference gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2021 -D warnings --test tests/test_evidence_status_reference.rs -o /tmp/evidence-status-reference
+          /tmp/evidence-status-reference --nocapture
       - name: Refuse actual compiler conformance claims
         run: |
           echo "HOST_ORACLE_ONLY: no Oreslang compiler or guest executed"
