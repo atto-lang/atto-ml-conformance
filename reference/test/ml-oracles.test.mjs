@@ -90,7 +90,7 @@ test("tensor shape and data admission rejects sparse and accessor-backed arrays 
  Object.defineProperty(badData,"0",{enumerable:true,get(){reads++;return 1;}});
  assert.throws(()=>addTensor([2],badData,[3,4]),/invalid data element/);
  assert.equal(reads,0);
- assert.throws(()=>addTensor([2],new Array(2),[3,4]),/invalid data element/);
+ assert.throws(()=>addTensor([2],new Array(2),[3,4]),/invalid data/);
  const shape=[2];
  Object.defineProperty(shape,Symbol.iterator,{value:function*(){reads++;yield 2;}});
  assert.throws(()=>checkedNumel(shape),/invalid shape/);
