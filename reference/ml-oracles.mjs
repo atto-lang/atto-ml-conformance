@@ -58,6 +58,10 @@ export function matmul2d(leftShape, left, rightShape, right) {
   if (k !== k2) throw Error("matmul inner dimension mismatch");
   const a = checkedData(leftShape, left), b = checkedData(rightShape, right);
   checkedNumel([m, n]);
+  // Empty output needs no scalar loop. In particular, [huge, 0]
+  // otherwise iterates over an adversarially large row count for no work.
+  if (m === 0 || n === 0)
+    return Object.freeze({shape:Object.freeze([m,n]),data:Object.freeze([])});
   const result = new Array(m * n).fill(0);
   for (let i = 0; i < m; i++)
     for (let j = 0; j < n; j++)
