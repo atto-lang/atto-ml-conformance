@@ -96,3 +96,10 @@ test("tensor shape and data admission rejects sparse and accessor-backed arrays 
  assert.throws(()=>checkedNumel(shape),/invalid shape/);
  assert.equal(reads,0);
 });
+
+test("empty-result matmul avoids looping an enormous zero-width row count",()=>{
+  const r=matmul2d([Number.MAX_SAFE_INTEGER,0],[],[0,0],[]);
+  assert.deepEqual(r.shape,[Number.MAX_SAFE_INTEGER,0]);
+  assert.deepEqual(r.data,[]);
+  assert.ok(Object.isFrozen(r.shape)&&Object.isFrozen(r.data));
+});
