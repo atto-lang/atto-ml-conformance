@@ -68,3 +68,38 @@ test("SGD refuses NaN or invalid learning rate",()=>{
  assert.throws(()=>linearSgdEpoch([[0,1]],0,0,0),/invalid SGD/);
  assert.throws(()=>linearSgdEpoch([[NaN,1]],0,0,.1),/finite scalar/);
 });
+
+test("zero extents are order-independent after validating every dimension",()=>{
+ assert.equal(checkedNumel([Number.MAX_SAFE_INTEGER,0]),0);
+ assert.equal(checkedNumel([0,Number.MAX_SAFE_INTEGER]),0);
+ assert.equal(checkedNumel([1000001,0],1),0);
+ assert.throws(()=>checkedNumel([0,-1]),/invalid dimension/);
+ assert.throws(()=>checkedNumel([0,1.5]),/invalid dimension/);
+ const out=addTensor([Number.MAX_SAFE_INTEGER,0],[],[]);
+ assert.deepEqual(out.shape,[Number.MAX_SAFE_INTEGER,0]);
+ assert.deepEqual(out.data,[]);
+});
+
+test("tensor shape and data admission rejects sparse and accessor-backed arrays without running getters",()=>{
+ let reads=0;
+ const badShape=[2];
+ Object.defineProperty(badShape,"0",{enumerable:true,get(){reads++;return 2;}});
+ assert.throws(()=>checkedNumel(badShape),/invalid shape element/);
+ assert.equal(reads,0);
+ const badData=[1,2];
+ Object.defineProperty(badData,"0",{enumerable:true,get(){reads++;return 1;}});
+ assert.throws(()=>addTensor([2],badData,[3,4]),/invalid data element/);
+ assert.equal(reads,0);
+ assert.throws(()=>addTensor([2],new Array(2),[3,4]),/invalid data/);
+ const shape=[2];
+ Object.defineProperty(shape,Symbol.iterator,{value:function*(){reads++;yield 2;}});
+ assert.throws(()=>checkedNumel(shape),/invalid shape/);
+ assert.equal(reads,0);
+});
+
+test("empty-result matmul avoids looping an enormous zero-width row count",()=>{
+  const r=matmul2d([Number.MAX_SAFE_INTEGER,0],[],[0,0],[]);
+  assert.deepEqual(r.shape,[Number.MAX_SAFE_INTEGER,0]);
+  assert.deepEqual(r.data,[]);
+  assert.ok(Object.isFrozen(r.shape)&&Object.isFrozen(r.data));
+});

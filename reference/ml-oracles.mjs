@@ -5,14 +5,33 @@ function finite(x, label) {
   if (typeof x !== "number" || !Number.isFinite(x)) throw Error(label + ": finite scalar required");
   return x;
 }
+// Snapshot canonical numeric arrays without invoking custom iterators, getters,
+// inherited slots or Array.map() holes in a host-only reference oracle.
+function denseData(array, label, maxLength) {
+  if (!Array.isArray(array) || Object.getPrototypeOf(array) !== Array.prototype ||
+      array.length > maxLength || Reflect.ownKeys(array).length !== array.length + 1)
+    throw Error("invalid " + label);
+  const result = [];
+  for (let i = 0; i < array.length; i++) {
+    const slot = Object.getOwnPropertyDescriptor(array, String(i));
+    if (!slot || !Object.hasOwn(slot, "value"))
+      throw Error("invalid " + label + " element");
+    result.push(slot.value);
+  }
+  return result;
+}
 export function checkedNumel(shape, maxElements = 1_000_000) {
-  if (!Array.isArray(shape) || shape.length > 8 ||
-      !Number.isSafeInteger(maxElements) || maxElements < 0)
+  if (!Number.isSafeInteger(maxElements) || maxElements < 0)
     throw Error("invalid shape or bound");
-  let count = 1;
-  for (const d of shape) {
+  const dimensions = denseData(shape, "shape", 8);
+  for (const d of dimensions)
     if (!Number.isSafeInteger(d) || d < 0) throw Error("invalid dimension");
-    if (count !== 0 && d !== 0 && count > Math.floor(maxElements / d))
+  // A zero-extent tensor occupies zero elements regardless of where zero
+  // appears; validate *all* dimensions before computing nonzero products.
+  if (dimensions.includes(0)) return 0;
+  let count = 1;
+  for (const d of dimensions) {
+    if (count > Math.floor(maxElements / d))
       throw Error("shape product overflow or allocation bound");
     count *= d;
   }
@@ -22,22 +41,27 @@ export function checkedNumel(shape, maxElements = 1_000_000) {
 function checkedData(shape, data) {
   const n = checkedNumel(shape);
   if (!Array.isArray(data) || data.length !== n) throw Error("shape/data mismatch");
-  return data.map((x, i) => finite(x, "data[" + i + "]"));
+  return denseData(data, "data", n).map((x, i) => finite(x, "data[" + i + "]"));
 }
 export function addTensor(shape, left, right) {
   const a = checkedData(shape, left);
   const b = checkedData(shape, right);
-  return Object.freeze({shape: Object.freeze([...shape]),
+  return Object.freeze({shape: Object.freeze(denseData(shape, 'shape', 8)),
     data: Object.freeze(a.map((x, i) => finite(x + b[i], "add result")))});
 }
 export function matmul2d(leftShape, left, rightShape, right) {
   if (!Array.isArray(leftShape) || leftShape.length !== 2 ||
       !Array.isArray(rightShape) || rightShape.length !== 2)
     throw Error("matmul requires rank-2");
-  const [m, k] = leftShape, [k2, n] = rightShape;
+  const [m, k] = denseData(leftShape, 'shape', 8);
+  const [k2, n] = denseData(rightShape, 'shape', 8);
   if (k !== k2) throw Error("matmul inner dimension mismatch");
   const a = checkedData(leftShape, left), b = checkedData(rightShape, right);
   checkedNumel([m, n]);
+  // Empty output needs no scalar loop. In particular, [huge, 0]
+  // otherwise iterates over an adversarially large row count for no work.
+  if (m === 0 || n === 0)
+    return Object.freeze({shape:Object.freeze([m,n]),data:Object.freeze([])});
   const result = new Array(m * n).fill(0);
   for (let i = 0; i < m; i++)
     for (let j = 0; j < n; j++)
