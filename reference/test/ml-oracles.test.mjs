@@ -4,6 +4,16 @@ import {checkedNumel,addTensor,matmul2d,variable,add,multiply,gradients,finiteDi
 
 test("scalar tensor rank zero has one element",()=>assert.equal(checkedNumel([]),1));
 test("zero-length dimensions have zero elements",()=>assert.equal(checkedNumel([3,0,4]),0));
+test("zero-extent numel is order-independent, even with other large safe dimensions",()=>{
+ const big=Number.MAX_SAFE_INTEGER;
+ for(const shape of [[big,0],[0,big],[2,big,0],[0,2,big],[big,2,0]]){
+  assert.equal(checkedNumel(shape,1),0,JSON.stringify(shape));
+ }
+ assert.throws(()=>checkedNumel([0,-1]),/invalid dimension/);
+ assert.throws(()=>checkedNumel([0,1.5]),/invalid dimension/);
+ assert.throws(()=>checkedNumel([0,Number.MAX_SAFE_INTEGER+1]),/invalid dimension/);
+ assert.throws(()=>checkedNumel([big,2]),/overflow/);
+});
 test("checked row-major product",()=>assert.equal(checkedNumel([2,3,4]),24));
 test("reject negative dimension",()=>assert.throws(()=>checkedNumel([-1]),/invalid dimension/));
 test("reject fractional dimension",()=>assert.throws(()=>checkedNumel([1.25]),/invalid dimension/));
