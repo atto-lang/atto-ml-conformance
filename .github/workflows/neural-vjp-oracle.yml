@@ -5,6 +5,9 @@ on:
     paths:
       - "tests_rust/neural_vjp_oracle.rs"
       - ".github/workflows/neural-vjp-oracle.yml"
+      - "manifests/neural-workspace-v1.lock"
+      - "scripts/verify_neural_workspace.sh"
+      - "tests_sh/verify_neural_workspace.test.sh"
   workflow_dispatch:
 
 permissions:
@@ -27,6 +30,9 @@ jobs:
           git rev-parse --verify HEAD^{commit}
           git rev-parse --verify HEAD^{tree}
           rustc --version
+      - name: Test source-only neural workspace SHA/blob verifier
+        shell: bash
+        run: bash tests_sh/verify_neural_workspace.test.sh
       - name: Compile reference oracle with warnings denied
         shell: bash
         run: |
