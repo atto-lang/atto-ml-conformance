@@ -59,6 +59,9 @@ while read -r directory repository expected_commit expected_tree extra; do
   # Independently hash EVERY tracked on-disk blob against the locked HEAD,
   # catching modified/masked files and mismatching executable bytes.
   files=0
+  listing=$(mktemp)
+  git_safe -C "$root" ls-tree -rz --full-tree HEAD > "$listing" ||
+    die "$directory: unable to enumerate tracked Git tree"
   while IFS= read -r -d '' entry; do
     [[ "$entry" == *$'\t'* ]] || die "$directory: malformed Git ls-tree record"
     header=${entry%%$'\t'*}
@@ -77,7 +80,8 @@ while read -r directory repository expected_commit expected_tree extra; do
     [[ "$actual_blob" == "$object_sha" ]] ||
       die "$directory: HEAD blob mismatch in $path"
     files=$((files+1))
-  done < <(git_safe -C "$root" ls-tree -rz --full-tree HEAD)
+  done < "$listing"
+  rm -f -- "$listing"
   (( files > 0 )) || die "$directory: empty or unreadable Git tree"
   printf 'NEURAL_SOURCE_OK checkout=%s commit=%s tree=%s verified_blobs=%s\n' \
     "$directory" "$actual_commit" "$actual_tree" "$files"
