@@ -29,6 +29,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
+      # Node and Rust host oracles are logically independent: run Node
+      # before Rust setup/dependency failures can obscure its test result.
+      - name: Run independent reference fixtures and pinned contract checks
+        run: npm test
       - name: Verify pinned Rust toolchain identity
         shell: bash
         run: |
@@ -42,8 +46,6 @@ jobs:
           cargo --version
           # Root Cargo.lock is not committed: host testing is NOT reproducible evidence.
           cargo test --all-targets
-      - name: Run independent reference fixtures and pinned contract checks
-        run: npm test
       - name: Refuse actual compiler conformance claims
         run: |
           echo "HOST_ORACLE_ONLY: no Oreslang compiler or guest executed"
