@@ -85,23 +85,44 @@ export function multiply(a, b) {
   return node("mul", finite(a.value * b.value, "product"),
     [{parent: a, weight: b.value}, {parent: b, weight: a.value}]);
 }
+// These are host-oracle resource budgets, not compiler/runtime quotas.
+const MAX_TAPE_NODES = 100_000;
+const MAX_TAPE_EDGES = 200_000;
 export function gradients(output) {
   const visited = new Set(), active = new Set(), topo = [];
-  function visit(n) {
-    if (!n || !Number.isSafeInteger(n.id) || !Array.isArray(n.parents) ||
-        !Object.isFrozen(n) || !Object.isFrozen(n.parents) || !Number.isFinite(n.value))
-      throw Error("malformed tape node");
-    if (active.has(n)) throw Error("tape cycle");
-    if (visited.has(n)) return;
-    active.add(n);
-    for (const edge of n.parents) {
+  // Iterative postorder prevents a caller-controlled deep tape from exhausting
+  // the JavaScript call stack before the oracle can classify it.
+  const stack = [{node: output, nextEdge: 0}];
+  let traversedEdges = 0;
+  while (stack.length) {
+    const frame = stack[stack.length - 1], n = frame.node;
+    if (frame.nextEdge === 0) {
+      if (!n || !Number.isSafeInteger(n.id) || n.id <= 0 ||
+          !Array.isArray(n.parents) || !Object.isFrozen(n) ||
+          !Object.isFrozen(n.parents) || !Number.isFinite(n.value))
+        throw Error("malformed tape node");
+      if (active.has(n)) throw Error("tape cycle");
+      if (visited.has(n)) { stack.pop(); continue; }
+      if (n.parents.length > MAX_TAPE_EDGES ||
+          visited.size + active.size >= MAX_TAPE_NODES)
+        throw Error("tape budget exceeded");
+      active.add(n);
+    }
+    if (frame.nextEdge < n.parents.length) {
+      if (++traversedEdges > MAX_TAPE_EDGES) throw Error("tape budget exceeded");
+      const edge = n.parents[frame.nextEdge++];
       if (!edge || !Object.isFrozen(edge) || !Number.isFinite(edge.weight))
         throw Error("invalid tape edge");
-      visit(edge.parent);
+      if (active.has(edge.parent)) throw Error("tape cycle");
+      if (!visited.has(edge.parent))
+        stack.push({node: edge.parent, nextEdge: 0});
+    } else {
+      active.delete(n);
+      visited.add(n);
+      topo.push(n);
+      stack.pop();
     }
-    active.delete(n); visited.add(n); topo.push(n);
   }
-  visit(output);
   const grads = new Map([[output, 1]]);
   for (const n of topo.reverse()) {
     const g = grads.get(n) || 0;
