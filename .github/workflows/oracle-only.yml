@@ -29,6 +29,13 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
+      - name: Verify pinned Rust toolchain identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+          test "$(cargo --version | awk '{print $2}')" = "1.95.0"
+          echo "Rust toolchain pinned to 1.95.0 by rust-toolchain.toml"
       - name: Run Rust evidence-classification oracle (unpinned root dependency graph)
         run: |
           rustc --version
