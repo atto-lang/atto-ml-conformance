@@ -140,18 +140,22 @@ export function finiteDifference(f, x, h = 1e-5) {
 }
 export function linearSgdEpoch(examples, w, b, learningRate) {
   finite(w, "weight"); finite(b, "bias"); finite(learningRate, "learningRate");
-  if (learningRate <= 0 || !Array.isArray(examples) || examples.length === 0 ||
-      examples.length > 10000) throw Error("invalid SGD configuration");
+  if (learningRate <= 0) throw Error("invalid SGD configuration");
+  // Snapshot exact dense records without invoking an untrusted iterator,
+  // per-array map override, or getter-backed slots.
+  const rows = denseData(examples, "examples", 10000);
+  if (rows.length === 0) throw Error("invalid SGD configuration");
   let loss = 0, dw = 0, db = 0;
-  for (const pair of examples) {
-    if (!Array.isArray(pair) || pair.length !== 2) throw Error("invalid training pair");
-    const [x, y] = pair.map((n) => finite(n, "example"));
+  for (const pair of rows) {
+    const fields = denseData(pair, "training pair", 2);
+    if (fields.length !== 2) throw Error("invalid training pair");
+    const [x, y] = fields.map((n) => finite(n, "example"));
     const err = finite(w * x + b - y, "prediction error");
     loss = finite(loss + err * err, "loss");
     dw = finite(dw + 2 * err * x, "weight gradient");
     db = finite(db + 2 * err, "bias gradient");
   }
-  const n = examples.length;
+  const n = rows.length;
   return Object.freeze({loss: loss / n,
     w: finite(w - learningRate * dw / n, "updated weight"),
     b: finite(b - learningRate * db / n, "updated bias")});
