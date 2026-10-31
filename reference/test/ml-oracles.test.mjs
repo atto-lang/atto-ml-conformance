@@ -128,3 +128,20 @@ test("oversized hostile frozen tape is rejected before traversing edges",()=>{
   const root=Object.freeze({id:999999,value:1,parents});
   assert.throws(()=>gradients(root),/tape budget exceeded/);
 });
+
+test("SGD input admission does not execute array getters, custom maps or iterators",()=>{
+  let invoked=0;
+  const badRows=[[1,2]];
+  Object.defineProperty(badRows,"0",{configurable:true,get(){invoked++;return [1,2];}});
+  assert.throws(()=>linearSgdEpoch(badRows,0,0,.1),/invalid examples element/);
+  const badPair=[1,2];
+  Object.defineProperty(badPair,"1",{configurable:true,get(){invoked++;return 2;}});
+  assert.throws(()=>linearSgdEpoch([badPair],0,0,.1),/invalid training pair element/);
+  const oddPair=[1,2];
+  oddPair.map=()=>{invoked++;return [999,999];};
+  assert.throws(()=>linearSgdEpoch([oddPair],0,0,.1),/invalid training pair/);
+  const customIterator=[[1,2]];
+  Object.defineProperty(customIterator,Symbol.iterator,{value:function*(){invoked++;yield [1,2];}});
+  assert.throws(()=>linearSgdEpoch(customIterator,0,0,.1),/invalid examples/);
+  assert.equal(invoked,0);
+});
