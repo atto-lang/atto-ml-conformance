@@ -6,16 +6,35 @@ permissions:
   contents: read
 jobs:
   host-oracle:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          # PR CI must check the authored head, not an implicit synthetic merge.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Verify exact-source checkout before host oracles
+        shell: bash
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          git diff --quiet HEAD --
+          test -z "$(git ls-files --others --exclude-standard)"
+          echo "HOST_ORACLE_SOURCE_COMMIT=$EXPECTED_SOURCE_SHA"
+          echo "HOST_ORACLE_SOURCE_TREE=$(git rev-parse 'HEAD^{tree}')"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
-      - name: Run Rust evidence-classification oracle
-        run: cargo test --all-targets
+      - name: Run Rust evidence-classification oracle (unpinned root dependency graph)
+        run: |
+          rustc --version
+          cargo --version
+          # Root Cargo.lock is not committed: host testing is NOT reproducible evidence.
+          cargo test --all-targets
       - name: Run independent reference fixtures and pinned contract checks
         run: npm test
       - name: Refuse actual compiler conformance claims
