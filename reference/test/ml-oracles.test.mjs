@@ -113,3 +113,18 @@ test("empty-result matmul avoids looping an enormous zero-width row count",()=>{
   assert.deepEqual(r.data,[]);
   assert.ok(Object.isFrozen(r.shape)&&Object.isFrozen(r.data));
 });
+
+test("deep tapes use iterative traversal while retaining shared-edge gradient fan-in",()=>{
+  const leaf=variable(1), shared=variable(0);
+  let tip=leaf;
+  for(let i=0;i<20000;i++) tip=add(tip,shared);
+  const g=gradients(tip);
+  assert.equal(g.get(leaf),1);
+  assert.equal(g.get(shared),20000);
+});
+test("oversized hostile frozen tape is rejected before traversing edges",()=>{
+  const leaf=variable(1), edge=Object.freeze({parent:leaf,weight:1});
+  const parents=Object.freeze(new Array(200001).fill(edge));
+  const root=Object.freeze({id:999999,value:1,parents});
+  assert.throws(()=>gradients(root),/tape budget exceeded/);
+});
