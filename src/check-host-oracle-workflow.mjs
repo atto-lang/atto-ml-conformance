@@ -20,7 +20,8 @@ export function checkHostOracleWorkflow(text) {
   if (top.join(',') !== 'name,on,permissions,jobs') throw Error('duplicate or unexpected top-level YAML key');
   const permissions = active.match(/^permissions:\n([\s\S]*?)^jobs:$/m)?.[1];
   if (permissions === undefined || permissions.trim() !== 'contents: read') throw Error('permissions drift');
-  const headings = [...active.matchAll(/^  ([a-z][a-z0-9-]*):\s*$/gm)].map(m => m[1]);
+  const jobsOnly = active.slice(active.indexOf('\njobs:\n') + '\njobs:\n'.length);
+  const headings = [...jobsOnly.matchAll(/^  ([a-z][a-z0-9-]*):\s*$/gm)].map(m => m[1]);
   if (headings.join(',') !== 'node-reference,rust-reference') throw Error('duplicate, renamed or unexpected job');
   for (const [job, label] of [[node, 'Node'], [rust, 'Rust']]) {
 
