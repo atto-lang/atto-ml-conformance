@@ -297,3 +297,46 @@ test("randomized finite differences agree with analytic cubic derivatives",()=>{
     assert.ok(Math.abs(approx-analytic)<1e-8);
   }
 });
+
+test("gradient accumulation refuses finite-input overflow",()=>{
+  const leaf=variable(1);
+  const edge=Object.freeze({parent:leaf,weight:1e308});
+  const root=Object.freeze({id:888888,value:1,parents:Object.freeze([edge,edge])});
+  assert.throws(()=>gradients(root),/gradient accumulation: finite scalar required/);
+});
+test("repeated frozen edges accumulate separately without duplicate-credit loss",()=>{
+  const leaf=variable(2);
+  const edge=Object.freeze({parent:leaf,weight:0.25});
+  const root=Object.freeze({id:888889,value:2,parents:Object.freeze(new Array(4096).fill(edge))});
+  assert.equal(gradients(root).get(leaf),1024);
+});
+test("graph node budget is enforced on a deep acyclic frozen tape",()=>{
+  let tip=variable(1);
+  for(let i=0;i<100001;i++){
+    const edge=Object.freeze({parent:tip,weight:1});
+    tip=Object.freeze({id:1000000+i,value:1,parents:Object.freeze([edge])});
+  }
+  assert.throws(()=>gradients(tip),/tape budget exceeded/);
+});
+test("frozen parent array with custom iterator is rejected without invocation",()=>{
+  let invoked=0;
+  const leaf=variable(1);
+  const parents=[Object.freeze({parent:leaf,weight:1})];
+  Object.defineProperty(parents,Symbol.iterator,{value:function*(){invoked++;yield null;}});
+  const root=Object.freeze({id:888890,value:1,parents:Object.freeze(parents)});
+  assert.throws(()=>gradients(root),/invalid tape parents/);
+  assert.equal(invoked,0);
+});
+test("finite difference detects overflow even when endpoint function values are finite",()=>{
+  assert.throws(()=>finiteDifference(x=>x>1?1e308:-1e308,1,1e-5),/finite-difference result: finite scalar required/);
+});
+test("rank-zero and zero-extent tensor bounds respect a zero allocation budget",()=>{
+  assert.equal(checkedNumel([0],0),0);
+  assert.equal(checkedNumel([5,0],0),0);
+  assert.throws(()=>checkedNumel([],0),/overflow|bound/);
+  assert.throws(()=>checkedNumel([1],0),/overflow|bound/);
+});
+test("row-major matmul rejects valid-shape truncated backing before arithmetic",()=>{
+  assert.throws(()=>matmul2d([2,2],[1,2,3],[2,1],[1,2]),/shape\/data mismatch/);
+  assert.throws(()=>matmul2d([2,2],[1,2,3,4],[2,1],[1]),/shape\/data mismatch/);
+});
