@@ -88,34 +88,61 @@ export function multiply(a, b) {
 // These are host-oracle resource budgets, not compiler/runtime quotas.
 const MAX_TAPE_NODES = 100_000;
 const MAX_TAPE_EDGES = 200_000;
+// Only frozen, own-data records enter the host oracle. A frozen JavaScript
+// object may still contain getters or sparse array slots; reading them would
+// invoke caller code during an ostensibly independent numerical check.
+function ownTapeField(record, field, error) {
+  const descriptor = Object.getOwnPropertyDescriptor(record, field);
+  if (!descriptor || !Object.hasOwn(descriptor, "value")) throw Error(error);
+  return descriptor.value;
+}
+function snapshotTapeParents(record) {
+  if (!record || typeof record !== "object" || !Object.isFrozen(record) ||
+      Object.getPrototypeOf(record) !== Object.prototype)
+    throw Error("malformed tape node");
+  const id = ownTapeField(record, "id", "malformed tape node");
+  const value = ownTapeField(record, "value", "malformed tape node");
+  const rawParents = ownTapeField(record, "parents", "malformed tape node");
+  if (!Number.isSafeInteger(id) || id <= 0 || !Number.isFinite(value) ||
+      !Array.isArray(rawParents) || !Object.isFrozen(rawParents))
+    throw Error("malformed tape node");
+  if (rawParents.length > MAX_TAPE_EDGES) throw Error("tape budget exceeded");
+  const edges = denseData(rawParents, "tape parents", MAX_TAPE_EDGES);
+  return edges.map((edge) => {
+    if (!edge || typeof edge !== "object" || !Object.isFrozen(edge) ||
+        Object.getPrototypeOf(edge) !== Object.prototype)
+      throw Error("invalid tape edge");
+    const parent = ownTapeField(edge, "parent", "invalid tape edge");
+    const weight = ownTapeField(edge, "weight", "invalid tape edge");
+    if (!Number.isFinite(weight) || !parent || typeof parent !== "object")
+      throw Error("invalid tape edge");
+    return {parent, weight};
+  });
+}
 export function gradients(output) {
   const visited = new Set(), active = new Set(), topo = [];
-  // Iterative postorder prevents a caller-controlled deep tape from exhausting
-  // the JavaScript call stack before the oracle can classify it.
-  const stack = [{node: output, nextEdge: 0}];
+  const snapshots = new Map();
+  // Iterative postorder protects deep DAGs. Validated, snapped edges ensure
+  // second-pass accumulation never re-reads attacker-provided descriptors.
+  const stack = [{node: output, nextEdge: 0, edges: null}];
   let traversedEdges = 0;
   while (stack.length) {
     const frame = stack[stack.length - 1], n = frame.node;
-    if (frame.nextEdge === 0) {
-      if (!n || !Number.isSafeInteger(n.id) || n.id <= 0 ||
-          !Array.isArray(n.parents) || !Object.isFrozen(n) ||
-          !Object.isFrozen(n.parents) || !Number.isFinite(n.value))
-        throw Error("malformed tape node");
+    if (frame.edges === null) {
       if (active.has(n)) throw Error("tape cycle");
       if (visited.has(n)) { stack.pop(); continue; }
-      if (n.parents.length > MAX_TAPE_EDGES ||
-          visited.size + active.size >= MAX_TAPE_NODES)
+      if (visited.size + active.size >= MAX_TAPE_NODES)
         throw Error("tape budget exceeded");
+      frame.edges = snapshotTapeParents(n);
+      snapshots.set(n, frame.edges);
       active.add(n);
     }
-    if (frame.nextEdge < n.parents.length) {
+    if (frame.nextEdge < frame.edges.length) {
       if (++traversedEdges > MAX_TAPE_EDGES) throw Error("tape budget exceeded");
-      const edge = n.parents[frame.nextEdge++];
-      if (!edge || !Object.isFrozen(edge) || !Number.isFinite(edge.weight))
-        throw Error("invalid tape edge");
+      const edge = frame.edges[frame.nextEdge++];
       if (active.has(edge.parent)) throw Error("tape cycle");
       if (!visited.has(edge.parent))
-        stack.push({node: edge.parent, nextEdge: 0});
+        stack.push({node: edge.parent, nextEdge: 0, edges: null});
     } else {
       active.delete(n);
       visited.add(n);
@@ -126,7 +153,7 @@ export function gradients(output) {
   const grads = new Map([[output, 1]]);
   for (const n of topo.reverse()) {
     const g = grads.get(n) || 0;
-    for (const edge of n.parents) {
+    for (const edge of snapshots.get(n)) {
       const prev = grads.get(edge.parent) || 0;
       grads.set(edge.parent, finite(prev + g * edge.weight, "gradient accumulation"));
     }
