@@ -145,3 +145,43 @@ test("SGD input admission does not execute array getters, custom maps or iterato
   assert.throws(()=>linearSgdEpoch(customIterator,0,0,.1),/invalid examples/);
   assert.equal(invoked,0);
 });
+
+test("frozen accessor-backed tape nodes and edges cannot invoke getters",()=>{
+  let invoked=0;
+  const normal=variable(2);
+  const badValue={id:994,parents:Object.freeze([])};
+  Object.defineProperty(badValue,"value",{enumerable:true,get(){invoked++;return 9;}});
+  Object.freeze(badValue);
+  assert.throws(()=>gradients(badValue),/malformed tape node/);
+  const badParents={id:995,value:1};
+  Object.defineProperty(badParents,"parents",{enumerable:true,get(){invoked++;return [];}});
+  Object.freeze(badParents);
+  assert.throws(()=>gradients(badParents),/malformed tape node/);
+  const badEdge={parent:normal};
+  Object.defineProperty(badEdge,"weight",{enumerable:true,get(){invoked++;return 1;}});
+  Object.freeze(badEdge);
+  const root=Object.freeze({id:996,value:1,parents:Object.freeze([badEdge])});
+  assert.throws(()=>gradients(root),/invalid tape edge/);
+  assert.equal(invoked,0);
+});
+test("frozen sparse or accessor-backed parent arrays fail closed",()=>{
+  const leaf=variable(1);
+  const sparse=Object.freeze(new Array(2));
+  const root=Object.freeze({id:997,value:1,parents:sparse});
+  assert.throws(()=>gradients(root),/invalid tape parents/);
+  let called=0;
+  const edges=[Object.freeze({parent:leaf,weight:1})];
+  Object.defineProperty(edges,"0",{get(){called++;return null;}});
+  const second=Object.freeze({id:998,value:1,parents:Object.freeze(edges)});
+  assert.throws(()=>gradients(second),/invalid tape parents element/);
+  assert.equal(called,0);
+});
+test("host oracle refuses exotic tape node and edge prototypes",()=>{
+  const leaf=variable(1);
+  const node=Object.freeze(Object.assign(Object.create({trusted:true}),{
+    id:999,value:1,parents:Object.freeze([])}));
+  assert.throws(()=>gradients(node),/malformed tape node/);
+  const edge=Object.freeze(Object.assign(Object.create({trusted:true}),{parent:leaf,weight:1}));
+  const root=Object.freeze({id:1000,value:1,parents:Object.freeze([edge])});
+  assert.throws(()=>gradients(root),/invalid tape edge/);
+});
