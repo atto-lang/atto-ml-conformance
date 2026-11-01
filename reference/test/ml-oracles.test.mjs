@@ -185,3 +185,53 @@ test("host oracle refuses exotic tape node and edge prototypes",()=>{
   const root=Object.freeze({id:1000,value:1,parents:Object.freeze([edge])});
   assert.throws(()=>gradients(root),/invalid tape edge/);
 });
+
+test("scalar graph constructors reject frozen accessor nodes without invoking them",()=>{
+  let fired=0;
+  const forged={id:777,parents:Object.freeze([])};
+  Object.defineProperty(forged,"value",{get(){fired++;return 42;}});
+  Object.freeze(forged);
+  const safe=variable(1);
+  assert.throws(()=>add(safe,forged),/malformed tape node|invalid graph node/);
+  assert.throws(()=>add(forged,safe),/malformed tape node|invalid graph node/);
+  assert.throws(()=>multiply(safe,forged),/malformed tape node|invalid graph node/);
+  assert.throws(()=>multiply(forged,safe),/malformed tape node|invalid graph node/);
+  assert.equal(fired,0);
+});
+test("graph constructors reject malformed frozen parent data",()=>{
+  const valid=variable(1);
+  const bad=Object.freeze({id:778,value:2,parents:Object.freeze(new Array(1))});
+  assert.throws(()=>add(valid,bad),/invalid tape parents/);
+  assert.throws(()=>multiply(valid,bad),/invalid tape parents/);
+  const odd=Object.freeze(Object.assign(Object.create({untrusted:true}),{
+    id:779,value:2,parents:Object.freeze([])}));
+  assert.throws(()=>add(odd,valid),/malformed tape node/);
+});
+test("independent dual-number derivatives match random shared scalar DAGs",()=>{
+  let state=0xabc123ef;
+  const next=()=>{state ^= state << 13;state ^= state >>> 17;state ^= state << 5;return (state>>>0)/4294967296;};
+  for(let trial=0;trial<2048;trial++){
+    const leaves=Array.from({length:5},()=>variable((next()-.5)*2));
+    let tape=leaves[Math.floor(next()*leaves.length)];
+    let forward={value:tape.value,partials:leaves.map(x=>x===tape?1:0)};
+    for(let step=0;step<6;step++){
+      const b=leaves[Math.floor(next()*leaves.length)];
+      const bv=b.value, isAdd=next()<.5;
+      if(isAdd){
+        tape=add(tape,b);
+        forward={value:forward.value+bv,
+          partials:forward.partials.map((d,j)=>d+(leaves[j]===b?1:0))};
+      }else{
+        tape=multiply(tape,b);
+        forward={value:forward.value*bv,
+          partials:forward.partials.map((d,j)=>d*bv+forward.value*(leaves[j]===b?1:0))};
+      }
+    }
+    const reverse=gradients(tape);
+    for(let j=0;j<leaves.length;j++){
+      const got=reverse.get(leaves[j])||0,expected=forward.partials[j];
+      assert.ok(Math.abs(got-expected)<1e-9*Math.max(1,Math.abs(expected)),
+        "trial="+trial+" leaf="+j+" reverse="+got+" dual="+expected);
+    }
+  }
+});
