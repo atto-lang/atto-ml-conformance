@@ -75,15 +75,21 @@ function node(op, value, parents) {
     parents: Object.freeze(parents.map(({parent, weight}) => Object.freeze({parent, weight: finite(weight, "weight")})))});
 }
 export function variable(x) { return node("var", x, []); }
+// Validate immediate parents before creating a derived node. Frozen objects
+// can contain getters, and Object.isFrozen alone is not a provenance check.
+function graphValue(input) {
+  snapshotTapeParents(input);
+  return ownTapeField(input, "value", "invalid graph node");
+}
 export function add(a, b) {
-  if (!a || !b || !Object.isFrozen(a) || !Object.isFrozen(b)) throw Error("invalid graph node");
-  return node("add", finite(a.value + b.value, "sum"),
+  const av = graphValue(a), bv = graphValue(b);
+  return node("add", finite(av + bv, "sum"),
     [{parent: a, weight: 1}, {parent: b, weight: 1}]);
 }
 export function multiply(a, b) {
-  if (!a || !b || !Object.isFrozen(a) || !Object.isFrozen(b)) throw Error("invalid graph node");
-  return node("mul", finite(a.value * b.value, "product"),
-    [{parent: a, weight: b.value}, {parent: b, weight: a.value}]);
+  const av = graphValue(a), bv = graphValue(b);
+  return node("mul", finite(av * bv, "product"),
+    [{parent: a, weight: bv}, {parent: b, weight: av}]);
 }
 // These are host-oracle resource budgets, not compiler/runtime quotas.
 const MAX_TAPE_NODES = 100_000;
