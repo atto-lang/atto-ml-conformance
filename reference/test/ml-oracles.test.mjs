@@ -235,3 +235,65 @@ test("independent dual-number derivatives match random shared scalar DAGs",()=>{
     }
   }
 });
+
+test("randomized checked shape products agree with independent BigInt algebra",()=>{
+  let state=0x76543210;
+  const next=()=>{state ^=state<<13;state ^=state>>>17;state ^=state<<5;return state>>>0;};
+  for(let trial=0;trial<4096;trial++){
+    const shape=Array.from({length:next()%6},()=>next()%1001);
+    const bound=next()%1000001;
+    const exact=shape.reduce((p,d)=>p*BigInt(d),1n);
+    const shouldFit=exact<=BigInt(bound);
+    if(shouldFit){
+      assert.equal(checkedNumel(shape,bound),Number(exact));
+    }else{
+      assert.throws(()=>checkedNumel(shape,bound),/overflow|bound/);
+    }
+  }
+});
+test("randomized matrix multiplication matches independent dot-product construction",()=>{
+  let state=0x32106543;
+  const next=()=>{state ^=state<<13;state ^=state>>>17;state ^=state<<5;return state>>>0;};
+  for(let trial=0;trial<1024;trial++){
+    const m=next()%5,k=next()%5,n=next()%5;
+    const left=Array.from({length:m*k},()=>((next()%31)-15));
+    const right=Array.from({length:k*n},()=>((next()%31)-15));
+    const expected=Array.from({length:m*n},(_,slot)=>{
+      const i=Math.floor(slot/n),j=slot%n;
+      return Array.from({length:k},(_,p)=>left[i*k+p]*right[p*n+j])
+        .reduce((a,b)=>a+b,0);
+    });
+    const out=matmul2d([m,k],left,[k,n],right);
+    assert.deepEqual(out.shape,[m,n]);
+    assert.deepEqual(out.data,expected);
+    assert.ok(Object.isFrozen(out.shape)&&Object.isFrozen(out.data));
+  }
+});
+test("randomized SGD updates match independent batch-gradient equations",()=>{
+  let state=0x496bf321;
+  const next=()=>{state ^=state<<13;state ^=state>>>17;state ^=state<<5;return (state>>>0)/4294967296;};
+  for(let trial=0;trial<1024;trial++){
+    const n=1+Math.floor(next()*8);
+    const pairs=Array.from({length:n},()=>[(next()-.5)*4,(next()-.5)*4]);
+    const w=(next()-.5)*4,b=(next()-.5)*4,rate=.01+next()*.1;
+    const error=pairs.map(([x,y])=>w*x+b-y);
+    const mean=(values)=>values.reduce((a,v)=>a+v,0)/n;
+    const loss=mean(error.map(e=>e*e));
+    const dw=mean(error.map((e,i)=>2*e*pairs[i][0]));
+    const db=mean(error.map(e=>2*e));
+    const actual=linearSgdEpoch(pairs,w,b,rate);
+    assert.ok(Math.abs(actual.loss-loss)<1e-11);
+    assert.ok(Math.abs(actual.w-(w-rate*dw))<1e-11);
+    assert.ok(Math.abs(actual.b-(b-rate*db))<1e-11);
+  }
+});
+test("randomized finite differences agree with analytic cubic derivatives",()=>{
+  let state=0x1f2e3d4c;
+  const next=()=>{state ^=state<<13;state ^=state>>>17;state ^=state<<5;return (state>>>0)/4294967296;};
+  for(let trial=0;trial<1024;trial++){
+    const x=(next()-.5)*3,a=(next()-.5)*2,b=(next()-.5)*2,c=(next()-.5)*2;
+    const approx=finiteDifference(v=>a*v*v*v+b*v*v+c,x);
+    const analytic=3*a*x*x+2*b*x;
+    assert.ok(Math.abs(approx-analytic)<1e-8);
+  }
+});
