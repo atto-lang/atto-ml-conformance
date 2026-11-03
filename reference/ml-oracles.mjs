@@ -75,37 +75,91 @@ function node(op, value, parents) {
     parents: Object.freeze(parents.map(({parent, weight}) => Object.freeze({parent, weight: finite(weight, "weight")})))});
 }
 export function variable(x) { return node("var", x, []); }
+// Validate immediate parents before creating a derived node. Frozen objects
+// can contain getters, and Object.isFrozen alone is not a provenance check.
+function graphValue(input) {
+  snapshotTapeParents(input);
+  return ownTapeField(input, "value", "invalid graph node");
+}
 export function add(a, b) {
-  if (!a || !b || !Object.isFrozen(a) || !Object.isFrozen(b)) throw Error("invalid graph node");
-  return node("add", finite(a.value + b.value, "sum"),
+  const av = graphValue(a), bv = graphValue(b);
+  return node("add", finite(av + bv, "sum"),
     [{parent: a, weight: 1}, {parent: b, weight: 1}]);
 }
 export function multiply(a, b) {
-  if (!a || !b || !Object.isFrozen(a) || !Object.isFrozen(b)) throw Error("invalid graph node");
-  return node("mul", finite(a.value * b.value, "product"),
-    [{parent: a, weight: b.value}, {parent: b, weight: a.value}]);
+  const av = graphValue(a), bv = graphValue(b);
+  return node("mul", finite(av * bv, "product"),
+    [{parent: a, weight: bv}, {parent: b, weight: av}]);
+}
+// These are host-oracle resource budgets, not compiler/runtime quotas.
+const MAX_TAPE_NODES = 100_000;
+const MAX_TAPE_EDGES = 200_000;
+// Only frozen, own-data records enter the host oracle. A frozen JavaScript
+// object may still contain getters or sparse array slots; reading them would
+// invoke caller code during an ostensibly independent numerical check.
+function ownTapeField(record, field, error) {
+  const descriptor = Object.getOwnPropertyDescriptor(record, field);
+  if (!descriptor || !Object.hasOwn(descriptor, "value")) throw Error(error);
+  return descriptor.value;
+}
+function snapshotTapeParents(record) {
+  if (!record || typeof record !== "object" || !Object.isFrozen(record) ||
+      Object.getPrototypeOf(record) !== Object.prototype)
+    throw Error("malformed tape node");
+  const id = ownTapeField(record, "id", "malformed tape node");
+  const value = ownTapeField(record, "value", "malformed tape node");
+  const rawParents = ownTapeField(record, "parents", "malformed tape node");
+  if (!Number.isSafeInteger(id) || id <= 0 || !Number.isFinite(value) ||
+      !Array.isArray(rawParents) || !Object.isFrozen(rawParents))
+    throw Error("malformed tape node");
+  if (rawParents.length > MAX_TAPE_EDGES) throw Error("tape budget exceeded");
+  const edges = denseData(rawParents, "tape parents", MAX_TAPE_EDGES);
+  return edges.map((edge) => {
+    if (!edge || typeof edge !== "object" || !Object.isFrozen(edge) ||
+        Object.getPrototypeOf(edge) !== Object.prototype)
+      throw Error("invalid tape edge");
+    const parent = ownTapeField(edge, "parent", "invalid tape edge");
+    const weight = ownTapeField(edge, "weight", "invalid tape edge");
+    if (!Number.isFinite(weight) || !parent || typeof parent !== "object")
+      throw Error("invalid tape edge");
+    return {parent, weight};
+  });
 }
 export function gradients(output) {
   const visited = new Set(), active = new Set(), topo = [];
-  function visit(n) {
-    if (!n || !Number.isSafeInteger(n.id) || !Array.isArray(n.parents) ||
-        !Object.isFrozen(n) || !Object.isFrozen(n.parents) || !Number.isFinite(n.value))
-      throw Error("malformed tape node");
-    if (active.has(n)) throw Error("tape cycle");
-    if (visited.has(n)) return;
-    active.add(n);
-    for (const edge of n.parents) {
-      if (!edge || !Object.isFrozen(edge) || !Number.isFinite(edge.weight))
-        throw Error("invalid tape edge");
-      visit(edge.parent);
+  const snapshots = new Map();
+  // Iterative postorder protects deep DAGs. Validated, snapped edges ensure
+  // second-pass accumulation never re-reads attacker-provided descriptors.
+  const stack = [{node: output, nextEdge: 0, edges: null}];
+  let traversedEdges = 0;
+  while (stack.length) {
+    const frame = stack[stack.length - 1], n = frame.node;
+    if (frame.edges === null) {
+      if (active.has(n)) throw Error("tape cycle");
+      if (visited.has(n)) { stack.pop(); continue; }
+      if (visited.size + active.size >= MAX_TAPE_NODES)
+        throw Error("tape budget exceeded");
+      frame.edges = snapshotTapeParents(n);
+      snapshots.set(n, frame.edges);
+      active.add(n);
     }
-    active.delete(n); visited.add(n); topo.push(n);
+    if (frame.nextEdge < frame.edges.length) {
+      if (++traversedEdges > MAX_TAPE_EDGES) throw Error("tape budget exceeded");
+      const edge = frame.edges[frame.nextEdge++];
+      if (active.has(edge.parent)) throw Error("tape cycle");
+      if (!visited.has(edge.parent))
+        stack.push({node: edge.parent, nextEdge: 0, edges: null});
+    } else {
+      active.delete(n);
+      visited.add(n);
+      topo.push(n);
+      stack.pop();
+    }
   }
-  visit(output);
   const grads = new Map([[output, 1]]);
   for (const n of topo.reverse()) {
     const g = grads.get(n) || 0;
-    for (const edge of n.parents) {
+    for (const edge of snapshots.get(n)) {
       const prev = grads.get(edge.parent) || 0;
       grads.set(edge.parent, finite(prev + g * edge.weight, "gradient accumulation"));
     }
@@ -119,18 +173,22 @@ export function finiteDifference(f, x, h = 1e-5) {
 }
 export function linearSgdEpoch(examples, w, b, learningRate) {
   finite(w, "weight"); finite(b, "bias"); finite(learningRate, "learningRate");
-  if (learningRate <= 0 || !Array.isArray(examples) || examples.length === 0 ||
-      examples.length > 10000) throw Error("invalid SGD configuration");
+  if (learningRate <= 0) throw Error("invalid SGD configuration");
+  // Snapshot exact dense records without invoking an untrusted iterator,
+  // per-array map override, or getter-backed slots.
+  const rows = denseData(examples, "examples", 10000);
+  if (rows.length === 0) throw Error("invalid SGD configuration");
   let loss = 0, dw = 0, db = 0;
-  for (const pair of examples) {
-    if (!Array.isArray(pair) || pair.length !== 2) throw Error("invalid training pair");
-    const [x, y] = pair.map((n) => finite(n, "example"));
+  for (const pair of rows) {
+    const fields = denseData(pair, "training pair", 2);
+    if (fields.length !== 2) throw Error("invalid training pair");
+    const [x, y] = fields.map((n) => finite(n, "example"));
     const err = finite(w * x + b - y, "prediction error");
     loss = finite(loss + err * err, "loss");
     dw = finite(dw + 2 * err * x, "weight gradient");
     db = finite(db + 2 * err, "bias gradient");
   }
-  const n = examples.length;
+  const n = rows.length;
   return Object.freeze({loss: loss / n,
     w: finite(w - learningRate * dw / n, "updated weight"),
     b: finite(b - learningRate * db / n, "updated bias")});

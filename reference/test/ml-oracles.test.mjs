@@ -113,3 +113,230 @@ test("empty-result matmul avoids looping an enormous zero-width row count",()=>{
   assert.deepEqual(r.data,[]);
   assert.ok(Object.isFrozen(r.shape)&&Object.isFrozen(r.data));
 });
+
+test("deep tapes use iterative traversal while retaining shared-edge gradient fan-in",()=>{
+  const leaf=variable(1), shared=variable(0);
+  let tip=leaf;
+  for(let i=0;i<20000;i++) tip=add(tip,shared);
+  const g=gradients(tip);
+  assert.equal(g.get(leaf),1);
+  assert.equal(g.get(shared),20000);
+});
+test("oversized hostile frozen tape is rejected before traversing edges",()=>{
+  const leaf=variable(1), edge=Object.freeze({parent:leaf,weight:1});
+  const parents=Object.freeze(new Array(200001).fill(edge));
+  const root=Object.freeze({id:999999,value:1,parents});
+  assert.throws(()=>gradients(root),/tape budget exceeded/);
+});
+
+test("SGD input admission does not execute array getters, custom maps or iterators",()=>{
+  let invoked=0;
+  const badRows=[[1,2]];
+  Object.defineProperty(badRows,"0",{configurable:true,get(){invoked++;return [1,2];}});
+  assert.throws(()=>linearSgdEpoch(badRows,0,0,.1),/invalid examples element/);
+  const badPair=[1,2];
+  Object.defineProperty(badPair,"1",{configurable:true,get(){invoked++;return 2;}});
+  assert.throws(()=>linearSgdEpoch([badPair],0,0,.1),/invalid training pair element/);
+  const oddPair=[1,2];
+  oddPair.map=()=>{invoked++;return [999,999];};
+  assert.throws(()=>linearSgdEpoch([oddPair],0,0,.1),/invalid training pair/);
+  const customIterator=[[1,2]];
+  Object.defineProperty(customIterator,Symbol.iterator,{value:function*(){invoked++;yield [1,2];}});
+  assert.throws(()=>linearSgdEpoch(customIterator,0,0,.1),/invalid examples/);
+  assert.equal(invoked,0);
+});
+
+test("frozen accessor-backed tape nodes and edges cannot invoke getters",()=>{
+  let invoked=0;
+  const normal=variable(2);
+  const badValue={id:994,parents:Object.freeze([])};
+  Object.defineProperty(badValue,"value",{enumerable:true,get(){invoked++;return 9;}});
+  Object.freeze(badValue);
+  assert.throws(()=>gradients(badValue),/malformed tape node/);
+  const badParents={id:995,value:1};
+  Object.defineProperty(badParents,"parents",{enumerable:true,get(){invoked++;return [];}});
+  Object.freeze(badParents);
+  assert.throws(()=>gradients(badParents),/malformed tape node/);
+  const badEdge={parent:normal};
+  Object.defineProperty(badEdge,"weight",{enumerable:true,get(){invoked++;return 1;}});
+  Object.freeze(badEdge);
+  const root=Object.freeze({id:996,value:1,parents:Object.freeze([badEdge])});
+  assert.throws(()=>gradients(root),/invalid tape edge/);
+  assert.equal(invoked,0);
+});
+test("frozen sparse or accessor-backed parent arrays fail closed",()=>{
+  const leaf=variable(1);
+  const sparse=Object.freeze(new Array(2));
+  const root=Object.freeze({id:997,value:1,parents:sparse});
+  assert.throws(()=>gradients(root),/invalid tape parents/);
+  let called=0;
+  const edges=[Object.freeze({parent:leaf,weight:1})];
+  Object.defineProperty(edges,"0",{get(){called++;return null;}});
+  const second=Object.freeze({id:998,value:1,parents:Object.freeze(edges)});
+  assert.throws(()=>gradients(second),/invalid tape parents element/);
+  assert.equal(called,0);
+});
+test("host oracle refuses exotic tape node and edge prototypes",()=>{
+  const leaf=variable(1);
+  const node=Object.freeze(Object.assign(Object.create({trusted:true}),{
+    id:999,value:1,parents:Object.freeze([])}));
+  assert.throws(()=>gradients(node),/malformed tape node/);
+  const edge=Object.freeze(Object.assign(Object.create({trusted:true}),{parent:leaf,weight:1}));
+  const root=Object.freeze({id:1000,value:1,parents:Object.freeze([edge])});
+  assert.throws(()=>gradients(root),/invalid tape edge/);
+});
+
+test("scalar graph constructors reject frozen accessor nodes without invoking them",()=>{
+  let fired=0;
+  const forged={id:777,parents:Object.freeze([])};
+  Object.defineProperty(forged,"value",{get(){fired++;return 42;}});
+  Object.freeze(forged);
+  const safe=variable(1);
+  assert.throws(()=>add(safe,forged),/malformed tape node|invalid graph node/);
+  assert.throws(()=>add(forged,safe),/malformed tape node|invalid graph node/);
+  assert.throws(()=>multiply(safe,forged),/malformed tape node|invalid graph node/);
+  assert.throws(()=>multiply(forged,safe),/malformed tape node|invalid graph node/);
+  assert.equal(fired,0);
+});
+test("graph constructors reject malformed frozen parent data",()=>{
+  const valid=variable(1);
+  const bad=Object.freeze({id:778,value:2,parents:Object.freeze(new Array(1))});
+  assert.throws(()=>add(valid,bad),/invalid tape parents/);
+  assert.throws(()=>multiply(valid,bad),/invalid tape parents/);
+  const odd=Object.freeze(Object.assign(Object.create({untrusted:true}),{
+    id:779,value:2,parents:Object.freeze([])}));
+  assert.throws(()=>add(odd,valid),/malformed tape node/);
+});
+test("independent dual-number derivatives match random shared scalar DAGs",()=>{
+  let state=0xabc123ef;
+  const next=()=>{state ^= state << 13;state ^= state >>> 17;state ^= state << 5;return (state>>>0)/4294967296;};
+  for(let trial=0;trial<2048;trial++){
+    const leaves=Array.from({length:5},()=>variable((next()-.5)*2));
+    let tape=leaves[Math.floor(next()*leaves.length)];
+    let forward={value:tape.value,partials:leaves.map(x=>x===tape?1:0)};
+    for(let step=0;step<6;step++){
+      const b=leaves[Math.floor(next()*leaves.length)];
+      const bv=b.value, isAdd=next()<.5;
+      if(isAdd){
+        tape=add(tape,b);
+        forward={value:forward.value+bv,
+          partials:forward.partials.map((d,j)=>d+(leaves[j]===b?1:0))};
+      }else{
+        tape=multiply(tape,b);
+        forward={value:forward.value*bv,
+          partials:forward.partials.map((d,j)=>d*bv+forward.value*(leaves[j]===b?1:0))};
+      }
+    }
+    const reverse=gradients(tape);
+    for(let j=0;j<leaves.length;j++){
+      const got=reverse.get(leaves[j])||0,expected=forward.partials[j];
+      assert.ok(Math.abs(got-expected)<1e-9*Math.max(1,Math.abs(expected)),
+        "trial="+trial+" leaf="+j+" reverse="+got+" dual="+expected);
+    }
+  }
+});
+
+test("randomized checked shape products agree with independent BigInt algebra",()=>{
+  let state=0x76543210;
+  const next=()=>{state ^=state<<13;state ^=state>>>17;state ^=state<<5;return state>>>0;};
+  for(let trial=0;trial<4096;trial++){
+    const shape=Array.from({length:next()%6},()=>next()%1001);
+    const bound=next()%1000001;
+    const exact=shape.reduce((p,d)=>p*BigInt(d),1n);
+    const shouldFit=exact<=BigInt(bound);
+    if(shouldFit){
+      assert.equal(checkedNumel(shape,bound),Number(exact));
+    }else{
+      assert.throws(()=>checkedNumel(shape,bound),/overflow|bound/);
+    }
+  }
+});
+test("randomized matrix multiplication matches independent dot-product construction",()=>{
+  let state=0x32106543;
+  const next=()=>{state ^=state<<13;state ^=state>>>17;state ^=state<<5;return state>>>0;};
+  for(let trial=0;trial<1024;trial++){
+    const m=next()%5,k=next()%5,n=next()%5;
+    const left=Array.from({length:m*k},()=>((next()%31)-15));
+    const right=Array.from({length:k*n},()=>((next()%31)-15));
+    const expected=Array.from({length:m*n},(_,slot)=>{
+      const i=Math.floor(slot/n),j=slot%n;
+      return Array.from({length:k},(_,p)=>left[i*k+p]*right[p*n+j])
+        .reduce((a,b)=>a+b,0);
+    });
+    const out=matmul2d([m,k],left,[k,n],right);
+    assert.deepEqual(out.shape,[m,n]);
+    assert.deepEqual(out.data,expected);
+    assert.ok(Object.isFrozen(out.shape)&&Object.isFrozen(out.data));
+  }
+});
+test("randomized SGD updates match independent batch-gradient equations",()=>{
+  let state=0x496bf321;
+  const next=()=>{state ^=state<<13;state ^=state>>>17;state ^=state<<5;return (state>>>0)/4294967296;};
+  for(let trial=0;trial<1024;trial++){
+    const n=1+Math.floor(next()*8);
+    const pairs=Array.from({length:n},()=>[(next()-.5)*4,(next()-.5)*4]);
+    const w=(next()-.5)*4,b=(next()-.5)*4,rate=.01+next()*.1;
+    const error=pairs.map(([x,y])=>w*x+b-y);
+    const mean=(values)=>values.reduce((a,v)=>a+v,0)/n;
+    const loss=mean(error.map(e=>e*e));
+    const dw=mean(error.map((e,i)=>2*e*pairs[i][0]));
+    const db=mean(error.map(e=>2*e));
+    const actual=linearSgdEpoch(pairs,w,b,rate);
+    assert.ok(Math.abs(actual.loss-loss)<1e-11);
+    assert.ok(Math.abs(actual.w-(w-rate*dw))<1e-11);
+    assert.ok(Math.abs(actual.b-(b-rate*db))<1e-11);
+  }
+});
+test("randomized finite differences agree with analytic cubic derivatives",()=>{
+  let state=0x1f2e3d4c;
+  const next=()=>{state ^=state<<13;state ^=state>>>17;state ^=state<<5;return (state>>>0)/4294967296;};
+  for(let trial=0;trial<1024;trial++){
+    const x=(next()-.5)*3,a=(next()-.5)*2,b=(next()-.5)*2,c=(next()-.5)*2;
+    const approx=finiteDifference(v=>a*v*v*v+b*v*v+c,x);
+    const analytic=3*a*x*x+2*b*x;
+    assert.ok(Math.abs(approx-analytic)<1e-8);
+  }
+});
+
+test("gradient accumulation refuses finite-input overflow",()=>{
+  const leaf=variable(1);
+  const edge=Object.freeze({parent:leaf,weight:1e308});
+  const root=Object.freeze({id:888888,value:1,parents:Object.freeze([edge,edge])});
+  assert.throws(()=>gradients(root),/gradient accumulation: finite scalar required/);
+});
+test("repeated frozen edges accumulate separately without duplicate-credit loss",()=>{
+  const leaf=variable(2);
+  const edge=Object.freeze({parent:leaf,weight:0.25});
+  const root=Object.freeze({id:888889,value:2,parents:Object.freeze(new Array(4096).fill(edge))});
+  assert.equal(gradients(root).get(leaf),1024);
+});
+test("graph node budget is enforced on a deep acyclic frozen tape",()=>{
+  let tip=variable(1);
+  for(let i=0;i<100001;i++){
+    const edge=Object.freeze({parent:tip,weight:1});
+    tip=Object.freeze({id:1000000+i,value:1,parents:Object.freeze([edge])});
+  }
+  assert.throws(()=>gradients(tip),/tape budget exceeded/);
+});
+test("frozen parent array with custom iterator is rejected without invocation",()=>{
+  let invoked=0;
+  const leaf=variable(1);
+  const parents=[Object.freeze({parent:leaf,weight:1})];
+  Object.defineProperty(parents,Symbol.iterator,{value:function*(){invoked++;yield null;}});
+  const root=Object.freeze({id:888890,value:1,parents:Object.freeze(parents)});
+  assert.throws(()=>gradients(root),/invalid tape parents/);
+  assert.equal(invoked,0);
+});
+test("finite difference detects overflow even when endpoint function values are finite",()=>{
+  assert.throws(()=>finiteDifference(x=>x>1?1e308:-1e308,1,1e-5),/finite-difference result: finite scalar required/);
+});
+test("rank-zero and zero-extent tensor bounds respect a zero allocation budget",()=>{
+  assert.equal(checkedNumel([0],0),0);
+  assert.equal(checkedNumel([5,0],0),0);
+  assert.throws(()=>checkedNumel([],0),/overflow|bound/);
+  assert.throws(()=>checkedNumel([1],0),/overflow|bound/);
+});
+test("row-major matmul rejects valid-shape truncated backing before arithmetic",()=>{
+  assert.throws(()=>matmul2d([2,2],[1,2,3],[2,1],[1,2]),/shape\/data mismatch/);
+  assert.throws(()=>matmul2d([2,2],[1,2,3,4],[2,1],[1]),/shape\/data mismatch/);
+});
