@@ -1,0 +1,7 @@
+# Reviewed source-only integration lock. The fourth checkout is another
+# clone/worktree of oreslang-ml at the actor-specific feature branch.
+# Format: workspace_directory source_repository commit_sha git_tree_sha
+oreslang-tensor oreslang-tensor 9c2befe7b5e10e7e3f6d0ec516ddbb58aec66cf3 23277aacb6be7bf2bc3086c657183c176c7f0109
+oreslang-autograd oreslang-autograd 17c9111bbf297ed4b8762041e5bab0d72e399573 a5bef34bff328e4a89777f5213891725ff753ff9
+oreslang-ml oreslang-ml f884887857e1218cd3ff333d1b115b5866135980 26605b6de3caa618889b2b48c7bb7d64bd3f3dd9
+oreslang-ml-neurons oreslang-ml 5ecf5cb0ed45f1593ec0c3769b95782c69dfec1e 4941aad9c05e70feca287f9f3f150fda1bd86da7

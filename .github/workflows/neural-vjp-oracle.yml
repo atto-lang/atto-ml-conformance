@@ -1,0 +1,51 @@
+name: Rust neural numeric oracle (REFERENCE_ONLY)
+
+on:
+  pull_request:
+    paths:
+      - "tests_rust/neural_vjp_oracle.rs"
+      - ".github/workflows/neural-vjp-oracle.yml"
+      - "manifests/neural-workspace-v1.lock"
+      - "scripts/verify_neural_workspace.sh"
+      - "tests_sh/verify_neural_workspace.test.sh"
+      - "scripts/run_neural_native_guests.sh"
+      - "tests_sh/run_neural_native_guests.test.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  neural-reference:
+    if: github.repository == 'ores-truffle-oreslang/oreslang-ml-conformance'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout same-repository reference source (read-only)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Record immutable checked-out reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse --verify HEAD^{commit}
+          git rev-parse --verify HEAD^{tree}
+          rustc --version
+      - name: Test source-only neural workspace SHA/blob verifier
+        shell: bash
+        run: bash tests_sh/verify_neural_workspace.test.sh
+      - name: Test native-gate admission using synthetic sources only
+        shell: bash
+        run: bash tests_sh/run_neural_native_guests.test.sh
+      - name: Compile reference oracle with warnings denied
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2021 --test -D warnings tests_rust/neural_vjp_oracle.rs -o "${RUNNER_TEMP}/neural-vjp-oracle"
+      - name: Run reference-only numerical checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/neural-vjp-oracle" --nocapture
+          echo 'REFERENCE_ONLY: NO ORESLANG GUEST, NO BACKEND ACCEPTANCE'
