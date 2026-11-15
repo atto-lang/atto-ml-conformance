@@ -20,6 +20,17 @@ class NumericOracleTest(unittest.TestCase):
         with self.assertRaises(NumericComparisonError):
             compare_vectors([1], [1, 2])
 
+    def test_reject_ints_outside_finite_float_range(self):
+        huge = 10 ** 1000
+        for expected, observed, kwargs in [
+            ([huge], [1], {}),
+            ([1], [huge], {}),
+            ([1], [1], {"atol": huge}),
+            ([1], [1], {"rtol": huge}),
+        ]:
+            with self.subTest(kwargs=kwargs), self.assertRaises(NumericComparisonError):
+                compare_vectors(expected, observed, **kwargs)
+
     def test_guest_evidence_fails_closed(self):
         meta = {"backend": "rs", "source_sha": "a" * 40,
                 "execution": "guest", "evidence_sha256": "b" * 64}
