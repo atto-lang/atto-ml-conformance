@@ -37,3 +37,9 @@ This README records the intended role of this repository; it is not a claim of f
 AttoLang is the public name; preserve existing Oreslang/.ores compatibility and use canonical .atto for new portable library source. This README defines scope, not feature readiness.
 
 **Acceptance:** name exact source SHA/tree, runtime/toolchain, positive and negative checks and execution receipt before claiming support. Host-only tests and empty CI steps do not prove guest execution.
+
+## Candidate numeric receipt validation (preview)
+
+The versioned `fixtures/numeric-v1.json` contains scalar, vector, dot, matrix multiplication and reduction cases. Validate a backend's claimed output with `python tools/check_numeric_receipt.py --receipt path/to/receipt.json` (schema: `schema_version`, `backend`, `source_sha`, `cases: [{id, actual}]`). Malformed, duplicate, non-finite, missing, extra, or out-of-tolerance outputs fail closed. `python -m unittest discover -s tests -v` runs host-only negative tests.
+
+**Evidence boundary:** This checker compares a candidate receipt to deterministic fixtures; it does not run a compiler, prove execution, attest provenance, or establish any backend conformance. Backend adapters must supply independent exact-source executed-guest evidence before a PASS can be considered language parity.
