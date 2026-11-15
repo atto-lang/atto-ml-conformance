@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "description": "Backend-neutral numeric results; host-only candidate receipt validation, not proof of guest execution",
+  "cases": [
+    {
+      "id": "scalar-add",
+      "operation": "add",
+      "inputs": [
+        4,
+        -7
+      ],
+      "expected": -3,
+      "abs_tol": 0,
+      "rel_tol": 0
+    },
+    {
+      "id": "vector-add",
+      "operation": "vector_add",
+      "inputs": [
+        [
+          1.25,
+          -2,
+          0
+        ],
+        [
+          2.75,
+          3,
+          0.5
+        ]
+      ],
+      "expected": [
+        4,
+        1,
+        0.5
+      ],
+      "abs_tol": 1e-12,
+      "rel_tol": 1e-12
+    },
+    {
+      "id": "dot-3",
+      "operation": "dot",
+      "inputs": [
+        [
+          0.1,
+          0.2,
+          0.3
+        ],
+        [
+          4,
+          5,
+          6
+        ]
+      ],
+      "expected": 3.2,
+      "abs_tol": 1e-12,
+      "rel_tol": 1e-12
+    },
+    {
+      "id": "matmul-2x2",
+      "operation": "matmul",
+      "inputs": [
+        [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ]
+        ],
+        [
+          [
+            5,
+            6
+          ],
+          [
+            7,
+            8
+          ]
+        ]
+      ],
+      "expected": [
+        [
+          19,
+          22
+        ],
+        [
+          43,
+          50
+        ]
+      ],
+      "abs_tol": 0,
+      "rel_tol": 0
+    },
+    {
+      "id": "sum-3",
+      "operation": "sum",
+      "inputs": [
+        [
+          0.125,
+          0.25,
+          0.5
+        ]
+      ],
+      "expected": 0.875,
+      "abs_tol": 0,
+      "rel_tol": 0
+    }
+  ]
+}
