@@ -7,7 +7,12 @@ class NumericComparisonError(ValueError):
 
 
 def _scalar(value):
-    return type(value) in (int, float) and math.isfinite(value)
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(value)
+    except (OverflowError, ValueError):
+        return False
 
 
 def compare_vectors(expected, observed, *, atol=0.0, rtol=0.0, max_elements=100000):
