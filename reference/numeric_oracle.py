@@ -14,10 +14,10 @@ def compare_vectors(expected, observed, *, atol=0.0, rtol=0.0, max_elements=1000
     """Elementwise finite numeric comparison with explicit absolute/relative tolerance."""
     if type(expected) not in (list, tuple) or type(observed) not in (list, tuple):
         raise NumericComparisonError("vectors must be lists or tuples")
-    if len(expected) != len(observed) or len(expected) > max_elements:
-        raise NumericComparisonError("vector shape mismatch or exceeded budget")
     if type(max_elements) is not int or not 0 <= max_elements <= 1000000:
         raise NumericComparisonError("invalid element budget")
+    if len(expected) != len(observed) or len(expected) > max_elements:
+        raise NumericComparisonError("vector shape mismatch or exceeded budget")
     if not _scalar(atol) or not _scalar(rtol) or atol < 0 or rtol < 0:
         raise NumericComparisonError("tolerances must be finite nonnegative scalars")
     failures = []
