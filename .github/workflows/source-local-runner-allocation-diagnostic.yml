@@ -1,0 +1,46 @@
+# No checkout, credentials, private repository reads, or remote source placement.
+# This diagnostic proves runner allocation only; never classify as ML test evidence.
+name: ML source-local runner admission diagnostic (no checkout)
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/source-local-runner-allocation-diagnostic.yml'
+  push:
+    paths:
+      - '.github/workflows/source-local-runner-allocation-diagnostic.yml'
+
+permissions: {}
+
+jobs:
+  ubuntu-2404-admission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Prove ubuntu-24.04 shell admission without source checkout
+        shell: bash
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REF_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$REPOSITORY" = "ores-truffle-oreslang/oreslang-ml-conformance"
+          [[ "$REF_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$RUNNER_OS" = "Linux"
+          printf 'RUNNER_ADMITTED label=ubuntu-24.04 source_checkout=false guest_executed=false head=%s\n' "$REF_SHA"
+
+  ubuntu-latest-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Prove ubuntu-latest shell admission without source checkout
+        shell: bash
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REF_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$REPOSITORY" = "ores-truffle-oreslang/oreslang-ml-conformance"
+          [[ "$REF_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$RUNNER_OS" = "Linux"
+          printf 'RUNNER_ADMITTED label=ubuntu-latest source_checkout=false guest_executed=false head=%s\n' "$REF_SHA"
