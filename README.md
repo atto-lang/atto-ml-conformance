@@ -43,3 +43,11 @@ This README records the intended role of this repository; it is not a claim of f
 AttoLang is the canonical project name; new source, examples and documentation use `.atto` and the `atto-lang` repository organization. This README defines scope, not feature readiness.
 
 **Acceptance:** name exact source SHA/tree, runtime/toolchain, positive and negative checks and execution receipt before claiming support. Host-only tests and empty CI steps do not prove guest execution.
+
+## Numerical conformance reference (host-only)
+
+`reference/numeric_oracle.py` defines finite scalar comparison with configurable nonnegative absolute and relative tolerances, explicit size budgeting, first-class mismatch indices, and a separate strict guest metadata admission helper. Run `python3 -m unittest discover -s tests -v` to check example pass/fail/negative cases.
+
+The comparator produces **host reference results only**. A digest-bearing guest metadata record is not proof of a real Atto execution; independent artifact/runner verification and exact target precision must be added before claiming ML/backend parity. This initial oracle does not support NaN equivalence, tensors with differing shapes, signed overflow, or nondeterministic reductions.
+
+The host oracle rejects integers too large to represent as finite floats instead of leaking Python `OverflowError`; a future Atto integer-exact comparison oracle requires a separate non-floating-point contract.
