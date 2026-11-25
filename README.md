@@ -1,18 +1,59 @@
-# Oreslang ML Conformance
+> **AI agent instructions (organization-wide):** Before working on code, issues, or pull requests, read and follow the [organization `AGENTS.md`](https://github.com/atto-lang/.github/blob/main/AGENTS.md), including its **merge-first stealth-development policy**. Honor any repository-local `AGENTS.md`, explicit holds, and GitHub-enforced rules.
 
-Independent numeric fixtures, gradient oracles, runner admission and evidence integrity for the Oreslang-native ML stack.
+# atto-ml-conformance
 
-**Important:** fixture self-tests and Rust host-oracle runs are not proof that any Oreslang compiler executed the examples. A real backend is admitted only with verifiable source, build and execution evidence.
+Cross-backend conformance tests for AttoLang machine-learning and numerical functionality.
 
-See `docs/CONTRACT.md` after bootstrap PR.
+## Naming migration and language authority
 
-## Repository ownership and migration (2026-11-08)
+This repository is maintained at [atto-lang/atto-ml-conformance](https://github.com/atto-lang/atto-ml-conformance); use `https://github.com/atto-lang/atto-ml-conformance.git` for Git remotes and canonical `.atto` source examples. The normative language contract is [atto-spec](https://github.com/atto-lang/atto-spec), with executable guest evidence tracked by [atto-platform-conformance](https://github.com/atto-lang/atto-platform-conformance). Follow current ownership, borrowing, effects, actor, and syntax rules there; do not infer implemented features from a README or unexecuted CI.
 
-**Current:** `ores-truffle-oreslang/oreslang-ml-conformance` in the old Oreslang org. **Public language:** AttoLang. Retain existing `.ores` files and historical repository/package/CLI aliases until compiler-backed `.atto` support and consumers have been validated.
+## Purpose
 
-- **This repo owns:** ML portability fixtures, numerical tolerance policies and pinned executable compiler receipts.
-- **Not owned here:** claiming guest parity from source-only or zero-step CI.
-- **Organizations:** [atto-lang](https://github.com/atto-lang) is for language/compiler/tooling, portable ML/scientific libraries, conformance and demonstrations. [atto-co](https://github.com/atto-co) is for independently governed cloud hosting, deployment, tenant identity, billing and commercial services. Similar `atto-*` repo names do not imply transferred source ID or content parity.
-- **Migration proposal:** identity-preserving GitHub transfer under the original repository name to `atto-lang/oreslang-ml-conformance` after reviews. No legacy-org direct move to `atto-co` is currently authorized. Later commercialization spinouts need their own signed off runbook.
+Validate tensor/numerical contracts, supported operations, and backend-specific availability.
 
-**Repository transfer gates:** coordinate a single owner/rollback plan at [issue #26](https://github.com/ores-truffle-oreslang/.github/issues/26); consult private [runbook #25](https://github.com/ores-truffle-oreslang/.github/pull/25). Record exact source commit SHA/tree and numeric ID, target visibility and protection/rulesets, source/target admin and independent security approvals, PRs/tags/releases, packages/import consumers, webhooks, GitHub Apps, Actions/billing/runners, secrets and Pages. Never mirror private source without separate approval. After actual GitHub transfer verify identical ID/history/tree, restore protections, update references independently and run exact-head CI with nonzero executed steps. `steps=[]`/`null` is `NOT_EXECUTED`; host/static tests cannot establish compiled AttoLang numerical or guest execution parity.
+## Repository responsibilities
+
+- Keep interfaces, schemas, and behavior documented in a backend-neutral form where applicable.
+- Use test fixtures and reproducible evidence to distinguish proposed behavior from implemented behavior.
+- Record breaking changes, migration notes, and dependencies on other AttoLang components.
+
+## Validation
+
+Validation should rely on checked-in tests and exact-commit CI results. When reporting parity, distinguish **passed**, **failed**, **unsupported**, and **not executed**. Avoid inferring guest-runtime support from host-only tests.
+
+## Status and development
+
+This README records the intended role of this repository; it is not a claim of feature completeness. Consult the source tree and workflow files for actual implementation and verified build commands. Contributions should preserve compatibility with the canonical language contract.
+
+## Ecosystem
+
+- [AttoLang](https://github.com/atto-lang)
+- [Language specification](https://github.com/atto-lang/atto-spec)
+- [Cross-platform conformance](https://github.com/atto-lang/atto-platform-conformance)
+
+## Repository ownership and contribution routing
+
+**Belongs here:** Shared numerical/ML fixtures, numerical tolerances, backend coverage matrix and portable model/tensor behavior receipts.
+
+**Belongs elsewhere:** ML features belong in atto-ml/atto-tensor/atto-autograd; general language compliance in atto-platform-conformance.
+
+**Security and portability boundary:** Report actual guest execution, target precision, deterministic settings and tolerances; do not confuse host Rust/Python reference results with AttoLang backend execution.
+
+AttoLang is the canonical project name; new source, examples and documentation use `.atto` and the `atto-lang` repository organization. This README defines scope, not feature readiness.
+
+**Acceptance:** name exact source SHA/tree, runtime/toolchain, positive and negative checks and execution receipt before claiming support. Host-only tests and empty CI steps do not prove guest execution.
+
+## Numerical conformance reference (host-only)
+
+`reference/numeric_oracle.py` defines finite scalar comparison with configurable nonnegative absolute and relative tolerances, explicit size budgeting, first-class mismatch indices, and a separate strict guest metadata admission helper. Run `python3 -m unittest discover -s tests -v` to check example pass/fail/negative cases.
+
+The comparator produces **host reference results only**. A digest-bearing guest metadata record is not proof of a real Atto execution; independent artifact/runner verification and exact target precision must be added before claiming ML/backend parity. This initial oracle does not support NaN equivalence, tensors with differing shapes, signed overflow, or nondeterministic reductions.
+
+The host oracle rejects integers too large to represent as finite floats instead of leaking Python `OverflowError`; a future Atto integer-exact comparison oracle requires a separate non-floating-point contract.
+
+## Organization boundaries and legacy compatibility
+
+Conformance owns independent numeric fixtures, gradient oracles, tolerance policies and pinned executable receipts, not production ML features. A fixture self-test does not admit a backend. New portable language libraries, compilers, tooling and conformance belong in AttoLang; managed cloud hosting, deployment, tenant identity and billing belong in separately governed services. Preserve supported legacy .ores source and historical package/CLI aliases until compiler-backed .atto replacements and consumers are validated. Similar repository names do not establish an identity-preserving transfer or source parity.
+
+Any future repository transfer requires an approved owner and rollback plan, independently authorized source and destination, recorded numeric repository IDs and commit/tree, verified visibility, rulesets, access, releases, packages, consumers, webhooks, Apps, secrets and runner continuity. Never transfer private source without separate explicit authorization. Verify identity, history and controls after a transfer and rerun exact-head CI with executed steps; zero-step and host-only tests do not certify native guest execution.
